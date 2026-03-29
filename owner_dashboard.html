@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<!--
+  Project  : IPRS — Intelligent Parking & Recognition System
+  File     : owner_dashboard.html
+  Modified : 2026-03-22
+  Rewrite  : Full mobile+desktop responsive — bottom tab nav on phone,
+             sidebar on desktop, touch gates, slot overlay bottom-sheet,
+             mobile record cards, dual serial monitor, PWA meta tags.
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>IPRS Owner v10</title>
+<script src="/static/chart.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'"></script>
+<style>
+:root{
+  --bg:#0b0f1a;--bg2:#111827;--bg3:#1a2133;--bg4:#1f2940;
+  --border:#1e2d45;--border2:#2a3f5f;
+  --accent:#3b82f6;--accent2:#8b5cf6;--accent3:#06b6d4;
+  --coin:#f59e0b;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;
+  --text:#e2e8f0;--muted:#64748b;--white:#fff;
+  --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono','Fira Mono',monospace;
+  --sh:0 4px 24px rgba(0,0,0,.5);--r:10px;
+  --nav-h:52px;--tab-h:58px;
+}
+[data-theme="light"]{
+  --bg:#f1f5f9;--bg2:#fff;--bg3:#f8fafc;--bg4:#e2e8f0;
+  --border:#e2e8f0;--border2:#cbd5e1;--text:#1e293b;--muted:#64748b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+*{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* LOGIN */
+#login-overlay{position:fixed;inset:0;background:#070a12;z-index:9999;
+  display:flex;align-items:center;justify-content:center;padding:16px}
+.login-box{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;
+  padding:32px 28px;width:100%;max-width:380px;box-shadow:var(--sh)}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-logo h1{font-size:22px;font-weight:800;color:var(--white)}
+.login-logo h1 span{color:var(--accent)}
+.login-logo p{font-size:12px;color:var(--muted);margin-top:4px}
+.lf{margin-bottom:14px}
+.lf label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.lf input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:12px 14px;color:var(--text);font-size:15px;outline:none;transition:.15s;min-height:48px}
+.lf input:focus{border-color:var(--accent)}
+#login-err{color:var(--red);font-size:12px;text-align:center;margin-bottom:8px;min-height:16px}
+.btn-login{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;
+  padding:14px;font-size:15px;font-weight:700;cursor:pointer;min-height:50px}
+.login-hint{text-align:center;margin-top:12px;font-size:11px;color:var(--muted)}
+
+/* TOPBAR */
+#topbar{background:var(--bg2);border-bottom:1px solid var(--border);
+  height:var(--nav-h);padding:0 12px;
+  display:flex;align-items:center;gap:8px;
+  position:sticky;top:0;z-index:200;
+  padding-top:env(safe-area-inset-top)}
+#topbar h1{font-size:14px;font-weight:800;color:var(--white);white-space:nowrap}
+#topbar h1 span{color:var(--accent)}
+.spacer{flex:1}
+#clock{font-size:11px;color:var(--muted);white-space:nowrap;display:none}
+.pill{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:700;cursor:pointer;
+  white-space:nowrap;user-select:none;border:1px solid transparent}
+.pill-ok{background:rgba(16,185,129,.12);color:var(--green);border-color:rgba(16,185,129,.25)}
+.pill-err{background:rgba(239,68,68,.12);color:var(--red);border-color:rgba(239,68,68,.25)}
+.pill-coin{background:rgba(245,158,11,.12);color:var(--coin);border-color:rgba(245,158,11,.25)}
+.btn-sm{background:rgba(100,116,139,.12);color:var(--muted);border:none;border-radius:6px;
+  padding:5px 9px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn-logout{background:rgba(239,68,68,.1);color:var(--red);border:none;border-radius:6px;
+  padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer}
+#btn-slot-toggle{display:flex;align-items:center;gap:5px;padding:5px 10px;font-size:11px;
+  font-weight:700;border:1px solid rgba(59,130,246,.3);border-radius:8px;
+  background:rgba(59,130,246,.12);color:var(--accent);cursor:pointer;white-space:nowrap}
+#btn-slot-toggle.all-free{background:rgba(16,185,129,.12);color:var(--green);border-color:rgba(16,185,129,.3)}
+#btn-slot-toggle.has-occ{background:rgba(239,68,68,.12);color:var(--red);border-color:rgba(239,68,68,.3)}
+
+/* SLOT OVERLAY — bottom-sheet on mobile, centered on desktop */
+#slot-overlay{display:none;position:fixed;inset:0;background:rgba(5,8,18,.88);z-index:5000;
+  align-items:flex-end;justify-content:center;backdrop-filter:blur(10px)}
+#slot-overlay.open{display:flex;animation:ovIn .22s ease}
+@keyframes ovIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+.slot-panel{background:var(--bg2);border:1px solid var(--border2);
+  border-radius:22px 22px 0 0;
+  padding:16px 20px calc(20px + env(safe-area-inset-bottom));
+  width:100%;max-width:580px;max-height:92vh;overflow-y:auto;
+  box-shadow:0 -20px 60px rgba(0,0,0,.6)}
+.sp-handle{width:40px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 16px}
+.sp-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.sp-title{font-size:18px;font-weight:900;color:var(--white)}
+.sp-title span{color:var(--accent)}
+.sp-sub{font-size:11px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+  display:inline-block;animation:blink 1.4s ease infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.btn-close-ov{background:rgba(100,116,139,.14);border:none;border-radius:8px;
+  width:36px;height:36px;color:var(--muted);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* 4 BIG SLOT SQUARES */
+.big-slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.big-slot{border-radius:14px;padding:20px 12px 16px;text-align:center;
+  border:2px solid transparent;position:relative;overflow:hidden;transition:all .3s}
+.big-slot::after{content:'';position:absolute;top:-40px;right:-40px;width:100px;height:100px;
+  border-radius:50%;opacity:.28;filter:blur(28px);pointer-events:none}
+.big-slot.s-empty{background:rgba(16,185,129,.07);border-color:rgba(16,185,129,.28)}
+.big-slot.s-empty::after{background:var(--green)}
+.big-slot.s-occupied{background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.28);
+  animation:pulsered 2.6s ease-in-out infinite}
+.big-slot.s-occupied::after{background:var(--red)}
+.big-slot.s-reserved{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.28)}
+.big-slot.s-reserved::after{background:var(--yellow)}
+@keyframes pulsered{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}60%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
+.bs-icon{font-size:26px;margin-bottom:6px;display:block}
+.bs-num{font-size:40px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.s-empty .bs-num{color:var(--green)}.s-occupied .bs-num{color:var(--red)}.s-reserved .bs-num{color:var(--yellow)}
+.bs-status{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;margin-top:5px}
+.s-empty .bs-status{color:rgba(16,185,129,.75)}.s-occupied .bs-status{color:rgba(239,68,68,.75)}.s-reserved .bs-status{color:rgba(245,158,11,.75)}
+.bs-plate{margin-top:8px;font-size:12px;font-weight:800;font-family:var(--mono);
+  letter-spacing:1.5px;color:var(--white);background:rgba(255,255,255,.07);
+  border-radius:5px;padding:4px 8px;display:inline-block;min-width:70px;min-height:26px}
+.slot-summary{display:flex;background:var(--bg3);border-radius:10px;border:1px solid var(--border);overflow:hidden}
+.sum-item{flex:1;text-align:center;padding:10px 6px}
+.sum-item+.sum-item{border-left:1px solid var(--border)}
+.sum-num{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums}
+.sum-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.sum-item.free .sum-num{color:var(--green)}.sum-item.occ .sum-num{color:var(--red)}
+.sum-item.res .sum-num{color:var(--yellow)}.sum-item.pct .sum-num{color:var(--accent)}
+
+/* DESKTOP LAYOUT */
+.main{display:grid;grid-template-columns:258px 1fr;min-height:calc(100vh - var(--nav-h))}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);
+  padding:12px 10px;display:flex;flex-direction:column;gap:10px;
+  overflow-y:auto;height:calc(100vh - var(--nav-h));position:sticky;top:var(--nav-h)}
+.content{padding:14px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+
+/* MOBILE BOTTOM TABS */
+#mobile-tabs{display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;
+  background:var(--bg2);border-top:1px solid var(--border);
+  padding-bottom:env(safe-area-inset-bottom)}
+.mtab-bar{display:flex}
+.mtab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:7px 4px;font-size:9px;font-weight:700;color:var(--muted);cursor:pointer;
+  border:none;background:none;min-height:var(--tab-h);gap:2px;letter-spacing:.2px;
+  text-transform:uppercase;transition:.15s}
+.mtab .mi{font-size:20px;line-height:1}
+.mtab.active{color:var(--accent)}
+.mpanel{display:none;padding:14px;padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 10px)}
+.mpanel.active{display:block}
+
+/* CARDS */
+.card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px;box-shadow:var(--sh)}
+.card-title{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
+  margin-bottom:10px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.card-title a{font-size:10px;color:var(--accent);cursor:pointer;font-weight:600}
+
+/* MINI SLOT GRID */
+.slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.slot{border-radius:7px;padding:8px 6px;text-align:center;font-weight:700;font-size:11px;border:1px solid transparent}
+.slot.empty{background:rgba(16,185,129,.12);color:var(--green);border-color:rgba(16,185,129,.25)}
+.slot.occupied{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.22)}
+.slot.reserved{background:rgba(245,158,11,.12);color:var(--yellow);border-color:rgba(245,158,11,.25)}
+.slot-count{text-align:center;margin-top:7px;font-size:12px;color:var(--muted)}
+.slot-count b{color:var(--text);font-size:14px}
+
+/* BOARDS */
+.board-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
+.board-row:last-child{border-bottom:none}
+.board-empty{font-size:11px;color:var(--muted);text-align:center;padding:10px 0}
+.board-ping-row{display:flex;justify-content:flex-end;margin-top:6px}
+.btn-ping{font-size:11px;padding:5px 12px;border-radius:6px;border:none;cursor:pointer;
+  background:rgba(59,130,246,.15);color:#60a5fa;min-height:34px;font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}.dot.off{background:var(--red)}
+
+/* BLACKLIST */
+.bl-input-row{display:flex;gap:6px;margin-bottom:8px}
+.bl-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  padding:8px 10px;color:var(--text);font-size:13px;text-transform:uppercase;
+  font-family:monospace;outline:none;min-height:40px}
+.bl-input:focus{border-color:var(--red)}
+.btn-bl-add{padding:8px 12px;font-size:12px;border:none;border-radius:7px;cursor:pointer;
+  background:rgba(239,68,68,.18);color:var(--red);font-weight:700;white-space:nowrap;min-height:40px}
+.bl-list{max-height:100px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px}
+.bl-tag{display:flex;align-items:center;gap:4px;background:rgba(239,68,68,.12);
+  border:1px solid rgba(239,68,68,.3);border-radius:4px;padding:3px 7px;
+  font-size:10px;font-family:monospace;color:var(--red);font-weight:700}
+.bl-tag button{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0;min-width:18px;min-height:18px}
+.bl-empty{font-size:11px;color:var(--muted);font-style:italic}
+.btn-flag-toggle{font-size:10px;padding:4px 8px;border-radius:4px;border:none;cursor:pointer;font-weight:700;min-height:28px}
+.btn-flag-toggle.flagged{background:rgba(239,68,68,.18);color:var(--red)}
+.btn-flag-toggle.clear{background:rgba(100,116,139,.12);color:var(--muted)}
+
+/* GATE */
+.gate-row{display:flex;gap:8px}
+.gate-grp{flex:1;display:flex;flex-direction:column;gap:4px}
+.gate-lbl{font-size:10px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:.4px;margin-bottom:2px}
+.btn{border:none;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:700;
+  cursor:pointer;width:100%;min-height:44px}
+.btn-green{background:rgba(16,185,129,.15);color:var(--green)}
+.btn-green:active{background:rgba(16,185,129,.3)}
+.btn-red{background:rgba(239,68,68,.12);color:var(--red)}
+.btn-red:active{background:rgba(239,68,68,.25)}
+.btn-blue{background:rgba(59,130,246,.12);color:var(--accent)}
+.btn-muted{background:rgba(100,116,139,.1);color:var(--muted)}
+.gate-mobile .btn{min-height:56px;font-size:15px;border-radius:12px}
+.gate-mobile .gate-lbl{font-size:12px}
+
+/* ALERTS */
+.alerts-list{display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto}
+.alert-item{font-size:11px;padding:6px 8px;border-radius:6px;border-left:3px solid}
+.alert-item.warn{background:rgba(245,158,11,.08);border-color:var(--yellow);color:var(--yellow)}
+.alert-item.err{background:rgba(239,68,68,.08);border-color:var(--red);color:var(--red)}
+.alert-item.info{background:rgba(59,130,246,.08);border-color:var(--accent);color:var(--muted)}
+
+/* KPI */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kpi{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px 12px;
+  box-shadow:var(--sh);position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;top:-20px;right:-20px;width:70px;height:70px;
+  border-radius:50%;opacity:.3;filter:blur(24px)}
+.kpi.green::after{background:var(--green)}.kpi.amber::after{background:var(--coin)}
+.kpi.blue::after{background:var(--accent)}.kpi.purple::after{background:var(--accent2)}
+.kpi .lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.kpi .val{font-size:22px;font-weight:900;color:var(--white);font-variant-numeric:tabular-nums}
+.kpi .val.green{color:var(--green)}.kpi .val.amber{color:var(--coin)}.kpi .val.blue{color:var(--accent)}
+.kpi .sub{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.stat .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:4px}
+.stat .val{font-size:20px;font-weight:900;color:var(--white)}
+.stat .sub{font-size:10px;color:var(--muted);margin-top:2px}
+.rev-bar-bg{height:3px;background:var(--border);border-radius:2px;margin-top:6px}
+.rev-bar-fill{height:100%;background:var(--green);border-radius:2px;transition:.5s}
+
+/* CHAIN */
+.chain-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.chain-icon{font-size:16px}.chain-label{font-size:12px;flex:1}
+.chain-ok{color:var(--green)}.chain-err{color:var(--red)}
+
+/* TWO-COL */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chart-wrap{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.chart-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+
+/* TABLE */
+.tbl-wrap{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.tbl-head{display:flex;align-items:center;gap:7px;padding:10px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tbl-head span{font-size:12px;font-weight:700;color:var(--text)}
+.tbl-head input,.tbl-head select{background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;padding:6px 8px;color:var(--text);font-size:12px;outline:none;min-height:34px}
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-height:340px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:700px}
+thead th{padding:7px 9px;text-align:left;font-size:10px;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--border);
+  white-space:nowrap;position:sticky;top:0;background:var(--bg3)}
+tbody td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.03);white-space:nowrap}
+tbody tr:hover td{background:rgba(255,255,255,.02)}
+.plate-cell{font-family:var(--mono);font-weight:700;color:var(--accent);font-size:13px}
+.status-badge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700}
+.status-badge.parked{background:rgba(16,185,129,.12);color:var(--green)}
+.status-badge.exited{background:rgba(100,116,139,.12);color:var(--muted)}
+.status-badge.reserved{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.25)}
+.status-badge.cancelled{background:rgba(100,116,139,.08);color:var(--muted);text-decoration:line-through}
+.thumb{width:44px;height:30px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid var(--border)}
+.conf-high{color:var(--green)}.conf-mid{color:var(--yellow)}.conf-low{color:var(--red)}
+
+/* MOBILE RECORD CARDS */
+.rec-cards{display:none}
+.rec-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px}
+.rc-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rc-img{width:50px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0}
+.rc-img-ph{width:50px;height:36px;background:var(--bg4);border-radius:6px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted)}
+.rc-plate{font-family:var(--mono);font-weight:800;font-size:16px;color:var(--accent)}
+.rc-time{font-size:10px;color:var(--muted);margin-top:2px}
+.rc-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.rc-cell{background:var(--bg);border-radius:6px;padding:5px 8px}
+.rc-cell .k{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.rc-cell .v{font-size:12px;font-weight:700;color:var(--text);margin-top:1px}
+.rc-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:8px;
+  padding-top:8px;border-top:1px solid var(--border)}
+
+/* SERIAL */
+.serial-wrap{background:#0a0e1a;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.serial-head{display:flex;align-items:center;gap:7px;padding:8px 11px;background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.serial-head span{font-size:11px;font-weight:700;color:var(--muted)}
+.serial-box-el{height:140px;overflow-y:auto;padding:6px 10px;font-family:var(--mono);font-size:11px;line-height:1.6}
+.slog{color:#64748b}.slog.warn{color:#f59e0b}.slog.err{color:#ef4444}.slog.ok{color:#10b981}
+.slog .ts{color:#334155;margin-right:5px}.slog .bid{color:#3b82f6;margin-right:4px}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
+  z-index:1000;align-items:center;justify-content:center;padding:16px}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;
+  padding:18px;max-width:400px;width:100%;text-align:center}
+.modal img{max-width:100%;border-radius:8px;margin-bottom:10px}
+
+/* TOAST */
+#toast{position:fixed;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 12px);
+  left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+  padding:9px 18px;font-size:13px;font-weight:600;opacity:0;transition:.3s;
+  pointer-events:none;z-index:9000;white-space:nowrap;box-shadow:var(--sh);
+  max-width:calc(100vw - 32px);text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:var(--green);color:var(--green)}
+#toast.err{border-color:var(--red);color:var(--red)}
+#toast.info{border-color:var(--accent);color:var(--accent)}
+
+/* DESKTOP (>=900px) */
+@media(min-width:900px){
+  #clock{display:block}
+  #mobile-tabs,.mpanel{display:none!important}
+  .main{display:grid!important}
+  .slot-panel{border-radius:22px;max-width:560px}
+  #slot-overlay{align-items:center}
+  #toast{bottom:22px}
+}
+
+/* MOBILE (<900px) */
+@media(max-width:899px){
+  .main{display:none!important}
+  #mobile-tabs{display:block}
+  .mpanel.active{display:block}
+  #btn-slot-toggle{font-size:10px;padding:4px 8px}
+  .kpi-strip,.stats-row{grid-template-columns:repeat(2,1fr);gap:8px}
+  .kpi{padding:12px 10px}.kpi .val{font-size:18px}
+  .two-col{grid-template-columns:1fr}
+  .tbl-scroll{display:none}.rec-cards{display:block}
+}
+/* NEW-1: RESERVED slot visual indicator — matches WROOM LED blink */
+@keyframes blinkRes{0%,49%{opacity:1}50%,100%{opacity:.25}}
+.slot.reserved,.big-slot.s-reserved{animation:blinkRes 1s step-start infinite!important}
+.big-slot.s-reserved .bs-num{color:var(--yellow)!important}
+.big-slot.s-reserved::after{background:var(--yellow)!important}
+@media(max-width:480px){
+  .kpi .val{font-size:16px}.kpi .lbl{font-size:8px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <h1>IPRS <span>v10</span> Owner</h1>
+      <p>Intelligent Parking &amp; Recognition System</p>
+    </div>
+    <div class="lf"><label>Username</label>
+      <input type="text" id="lu" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="lf"><label>Password</label>
+      <input type="password" id="lp" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div id="login-err"></div>
+    <button class="btn-login" id="btn-login">Login →</button>
+    <div class="login-hint">Default: admin / 12345678</div>
+  </div>
+</div>
+
+<!-- SLOT OVERLAY -->
+<div id="slot-overlay">
+  <div class="slot-panel">
+    <div class="sp-handle"></div>
+    <div class="sp-header">
+      <div>
+        <div class="sp-title">🅿 Slot <span>Status</span></div>
+        <div class="sp-sub"><span class="live-dot"></span>Live · auto-updates</div>
+      </div>
+      <button class="btn-close-ov" id="btn-close-slot">✕</button>
+    </div>
+    <div class="big-slot-grid" id="big-slot-grid"></div>
+    <div class="slot-summary">
+      <div class="sum-item free"><div class="sum-num" id="sum-free">–</div><div class="sum-lbl">Free</div></div>
+      <div class="sum-item occ"><div class="sum-num" id="sum-occ">–</div><div class="sum-lbl">Occupied</div></div>
+      <div class="sum-item res"><div class="sum-num" id="sum-res">–</div><div class="sum-lbl">Reserved</div></div>
+      <div class="sum-item pct"><div class="sum-num" id="sum-pct">–</div><div class="sum-lbl">Occupancy</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <h1>IPRS <span>v10</span></h1>
+  <span id="ws-pill" class="pill pill-err">WS ●</span>
+  <span id="chain-pill" class="pill pill-coin">⛓ …</span>
+  <button id="btn-slot-toggle">🅿 – Free ▾</button>
+  <div class="spacer"></div>
+  <span id="clock"></span>
+  <button class="btn-sm" id="theme-toggle">☀</button>
+  <button class="btn-logout" id="btn-logout" title="Logout">⏻</button>
+</div>
+
+<!-- DESKTOP MAIN (hidden on mobile via CSS) -->
+<div class="main" id="main-desktop">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="card">
+      <div class="card-title">Slots — Entry <a id="mini-expand">View Large ↗</a></div>
+      <div class="slot-grid" id="slot-entry"></div>
+      <div class="slot-count">Free: <b id="free-entry">–</b> / 4 &nbsp;|&nbsp;
+        <span id="res-count" style="color:var(--yellow)">0 res.</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Board Status</div>
+      <div id="board-list"><div class="board-empty" id="board-empty-msg">⏳ Waiting…</div></div>
+      <div class="board-ping-row"><button class="btn-ping" id="btn-ping-all">⟳ Ping All</button></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--red)">🚫 Blacklist</div>
+      <div class="bl-input-row">
+        <input class="bl-input" id="bl-plate-input" type="text" maxlength="12" placeholder="MH12AB1234"
+          autocomplete="off" spellcheck="false" inputmode="text"
+          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+          onkeydown="if(event.key==='Enter')addToBlacklist()">
+        <button class="btn-bl-add" onclick="addToBlacklist()">+ Add</button>
+      </div>
+      <div class="bl-list" id="bl-list">
+        <span class="bl-empty" id="bl-empty-msg">No plates blacklisted</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Gate Control</div>
+      <div class="gate-row">
+        <div class="gate-grp">
+          <div class="gate-lbl">ENTRY</div>
+          <button class="btn btn-green" id="entry-open">▲ Open</button>
+          <button class="btn btn-red" id="entry-close">▼ Close</button>
+        </div>
+        <div class="gate-grp">
+          <div class="gate-lbl">EXIT</div>
+          <button class="btn btn-green" id="exit-open">▲ Open</button>
+          <button class="btn btn-red" id="exit-close">▼ Close</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Alerts</div>
+      <div class="alerts-list" id="alerts-list"><div class="alert-item info">System nominal</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">SmartCoin™ Chain</div>
+      <div id="chain-detail">
+        <div class="chain-row"><span class="chain-icon">⛓</span>
+          <span class="chain-label">Click topbar pill to verify</span></div>
+      </div>
+      <button class="btn btn-muted" id="btn-verify-chain" style="width:100%;margin-top:8px;font-size:11px;border-radius:6px">
+        Verify Chain Integrity
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <div class="kpi-strip">
+      <div class="kpi amber"><div class="lbl">Tokens Today</div><div class="val amber" id="kpi-tokens">–</div><div class="sub">IPRS-C</div></div>
+      <div class="kpi green"><div class="lbl">Active Sessions</div><div class="val green" id="kpi-sessions">–</div><div class="sub">parked now</div></div>
+      <div class="kpi blue"><div class="lbl">Today Entries</div><div class="val blue" id="kpi-entries">–</div><div class="sub">vehicles in</div></div>
+      <div class="kpi purple"><div class="lbl">Overstay</div><div class="val" id="kpi-overstay" style="color:#a78bfa">–</div><div class="sub">&gt;4h parked</div></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="lbl">Revenue Today</div><div class="val" id="stat-revenue" style="color:var(--green)">–</div>
+        <div class="rev-bar-bg"><div class="rev-bar-fill" id="rev-bar" style="width:0%"></div></div></div>
+      <div class="stat"><div class="lbl">Avg Duration</div><div class="val" id="stat-avg-dur">–</div><div class="sub">min/session</div></div>
+      <div class="stat"><div class="lbl">Top Slot</div><div class="val" id="stat-top-slot">–</div><div class="sub">most used</div></div>
+      <div class="stat"><div class="lbl">Flagged</div><div class="val" id="stat-flagged" style="color:var(--red)">–</div><div class="sub">blacklist hits</div></div>
+    </div>
+    <div class="two-col">
+      <div class="chart-wrap"><div class="chart-title">Hourly Traffic</div><canvas id="hourly-chart" height="120"></canvas></div>
+      <div class="chart-wrap"><div class="chart-title">Revenue — 7 Days</div><canvas id="revenue-chart" height="120"></canvas></div>
+    </div>
+    <div class="tbl-wrap">
+      <div class="tbl-head">
+        <span>Vehicle Records</span><div style="flex:1"></div>
+        <input type="text" id="search" placeholder="Search plate…" style="width:130px">
+        <select id="status-filter"><option value="">All</option><option value="parked">Parked</option><option value="exited">Exited</option></select>
+        <button class="btn btn-blue" id="btn-csv" style="width:auto;padding:6px 12px;font-size:11px">⬇ CSV</button>
+        <button class="btn btn-muted" id="btn-refresh" style="width:auto;padding:6px 10px;font-size:11px">↺</button>
+      </div>
+      <div class="tbl-scroll">
+        <table><thead>
+          <tr><th>#</th><th>IMG</th><th>Plate</th><th>Entry</th><th>Exit</th>
+            <th>Slot</th><th>Dur</th><th>₹</th><th>Conf%</th><th>Status</th><th>Flag</th></tr>
+        </thead><tbody id="records-body"></tbody></table>
+      </div>
+      <div class="rec-cards" id="records-cards"></div>
+    </div>
+    <div class="serial-wrap">
+      <div class="serial-head">
+        <span>Serial Monitor</span><div style="flex:1"></div>
+        <input type="text" id="serial-filter" placeholder="Filter…"
+          style="width:100px;background:var(--bg);border:1px solid var(--border);
+            border-radius:4px;padding:3px 6px;color:var(--text);font-size:11px;outline:none">
+        <button class="btn btn-muted" id="btn-clear-serial" style="width:auto;font-size:10px;padding:3px 8px">Clear</button>
+        <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap">
+          <input type="checkbox" id="autoscroll" checked> Auto
+        </label>
+      </div>
+      <div id="serial-box" class="serial-box-el"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM TAB NAV -->
+<div id="mobile-tabs">
+  <div class="mtab-bar">
+    <button class="mtab active" data-tab="0"><span class="mi">📊</span>Overview</button>
+    <button class="mtab" data-tab="1"><span class="mi">🅿</span>Slots</button>
+    <button class="mtab" data-tab="2"><span class="mi">🚧</span>Gate</button>
+    <button class="mtab" data-tab="3"><span class="mi">📋</span>Records</button>
+    <button class="mtab" data-tab="4"><span class="mi">⚙️</span>More</button>
+  </div>
+</div>
+
+<!-- MOBILE PANEL 0: OVERVIEW -->
+<div class="mpanel active" id="mpanel-0">
+  <div class="kpi-strip" style="margin-bottom:12px">
+    <div class="kpi amber"><div class="lbl">Tokens</div><div class="val amber" id="m-kpi-tokens">–</div></div>
+    <div class="kpi green"><div class="lbl">Parked</div><div class="val green" id="m-kpi-sessions">–</div></div>
+    <div class="kpi blue"><div class="lbl">Entries</div><div class="val blue" id="m-kpi-entries">–</div></div>
+    <div class="kpi purple"><div class="lbl">Overstay</div><div class="val" id="m-kpi-overstay" style="color:#a78bfa">–</div></div>
+  </div>
+  <div class="stats-row" style="margin-bottom:12px">
+    <div class="stat"><div class="lbl">Revenue</div><div class="val" id="m-stat-rev" style="color:var(--green)">–</div>
+      <div class="rev-bar-bg"><div class="rev-bar-fill" id="m-rev-bar" style="width:0%"></div></div></div>
+    <div class="stat"><div class="lbl">Avg Dur</div><div class="val" id="m-stat-dur">–</div></div>
+    <div class="stat"><div class="lbl">Top Slot</div><div class="val" id="m-stat-slot">–</div></div>
+    <div class="stat"><div class="lbl">Flagged</div><div class="val" id="m-stat-flag" style="color:var(--red)">–</div></div>
+  </div>
+  <div class="chart-wrap" style="margin-bottom:12px">
+    <div class="chart-title">Hourly Traffic Today</div>
+    <canvas id="m-hourly-chart" height="120"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">Alerts</div>
+    <div class="alerts-list" id="m-alerts-list"><div class="alert-item info">System nominal</div></div>
+  </div>
+</div>
+
+<!-- MOBILE PANEL 1: SLOTS -->
+<div class="mpanel" id="mpanel-1">
+  <div class="big-slot-grid" id="m-big-slot-grid" style="margin-bottom:14px"></div>
+  <div class="slot-summary" style="margin-bottom:14px">
+    <div class="sum-item free"><div class="sum-num" id="m-sum-free">–</div><div class="sum-lbl">Free</div></div>
+    <div class="sum-item occ"><div class="sum-num" id="m-sum-occ">–</div><div class="sum-lbl">Occupied</div></div>
+    <div class="sum-item res"><div class="sum-num" id="m-sum-res">–</div><div class="sum-lbl">Reserved</div></div>
+    <div class="sum-item pct"><div class="sum-num" id="m-sum-pct">–</div><div class="sum-lbl">Occupancy</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Board Status</div>
+    <div id="m-board-list"><div class="board-empty">⏳ Waiting…</div></div>
+    <div class="board-ping-row"><button class="btn-ping" id="m-btn-ping-all">⟳ Ping All</button></div>
+  </div>
+</div>
+
+<!-- MOBILE PANEL 2: GATE -->
+<div class="mpanel" id="mpanel-2">
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">Gate Control</div>
+    <div class="gate-row gate-mobile">
+      <div class="gate-grp">
+        <div class="gate-lbl">ENTRY LANE</div>
+        <button class="btn btn-green" id="m-entry-open">▲ Open Entry</button>
+        <button class="btn btn-red" id="m-entry-close">▼ Close Entry</button>
+      </div>
+      <div class="gate-grp">
+        <div class="gate-lbl">EXIT LANE</div>
+        <button class="btn btn-green" id="m-exit-open">▲ Open Exit</button>
+        <button class="btn btn-red" id="m-exit-close">▼ Close Exit</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title" style="color:var(--red)">🚫 Blacklist</div>
+    <div class="bl-input-row">
+      <input class="bl-input" id="m-bl-plate-input" type="text" maxlength="12" placeholder="MH12AB1234"
+        autocomplete="off" spellcheck="false" inputmode="text"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+        onkeydown="if(event.key==='Enter')mAddBL()">
+      <button class="btn-bl-add" onclick="mAddBL()">+ Add</button>
+    </div>
+    <div class="bl-list" id="m-bl-list">
+      <span class="bl-empty" id="m-bl-empty-msg">No plates blacklisted</span>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE PANEL 3: RECORDS -->
+<div class="mpanel" id="mpanel-3">
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <input type="text" id="m-search" placeholder="Search plate…"
+      style="flex:1;min-width:120px;background:var(--bg3);border:1px solid var(--border);
+        border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;min-height:42px">
+    <select id="m-status-filter"
+      style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+        padding:9px 10px;color:var(--text);font-size:13px;outline:none;min-height:42px">
+      <option value="">All</option><option value="parked">Parked</option>
+      <option value="reserved">Reserved</option><option value="exited">Exited</option>
+    </select>
+  </div>
+  <div id="m-records-cards"></div>
+</div>
+
+<!-- MOBILE PANEL 4: MORE -->
+<div class="mpanel" id="mpanel-4">
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">SmartCoin™ Chain</div>
+    <div id="m-chain-detail">
+      <div class="chain-row"><span class="chain-icon">⛓</span><span class="chain-label">Tap to verify</span></div>
+    </div>
+    <button class="btn btn-muted" id="m-btn-verify-chain" style="margin-top:10px;font-size:12px;border-radius:8px">
+      🔐 Verify Chain Integrity
+    </button>
+  </div>
+  <div class="serial-wrap" style="margin-bottom:12px">
+    <div class="serial-head">
+      <span>Serial Monitor</span><div style="flex:1"></div>
+      <button class="btn btn-muted" id="m-btn-clear-serial" style="width:auto;font-size:10px;padding:3px 8px">Clear</button>
+    </div>
+    <div id="m-serial-box" class="serial-box-el"></div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn btn-muted" id="m-btn-csv" style="flex:1;font-size:12px">⬇ CSV</button>
+    <button class="btn btn-muted" id="m-theme-toggle" style="flex:1;font-size:12px">☀ Light</button>
+    <button class="btn" id="m-btn-logout"
+      style="flex:1;font-size:12px;background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)">
+      ⏻ Logout
+    </button>
+  </div>
+</div>
+
+<!-- IMAGE MODAL -->
+<div class="modal-bg" id="img-modal">
+  <div class="modal">
+    <img id="modal-img" src="" alt="Plate">
+    <div id="modal-caption" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    <button class="btn btn-muted" id="btn-close-modal" style="margin-top:10px">Close</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const SERVER_IP=location.hostname||"10.121.81.78";
+const SERVER_PORT=5000;
+const API_KEY="IPRS-2026-SECURE";
+const WS_URL=`ws://${SERVER_IP}:${SERVER_PORT}/ws/dashboard`;
+const API=`http://${SERVER_IP}:${SERVER_PORT}`;
+const REV_TARGET=2000;
+const CREDENTIALS={admin:"12345678",owner:"12345678"};
+const SESSION_KEY="iprs_v10_session";
+
+// AUTH
+function isLoggedIn(){try{const d=JSON.parse(atob(sessionStorage.getItem(SESSION_KEY)||""));return d.exp>Date.now();}catch{return false;}}
+function doLogin(){
+  const u=document.getElementById("lu").value.trim().toLowerCase();
+  const p=document.getElementById("lp").value;
+  if(!CREDENTIALS[u]||CREDENTIALS[u]!==p){document.getElementById("login-err").textContent="Invalid credentials.";return;}
+  sessionStorage.setItem(SESSION_KEY,btoa(JSON.stringify({user:u,exp:Date.now()+8*3600*1000})));
+  document.getElementById("login-overlay").style.display="none";
+  bootDashboard();
+}
+function doLogout(){sessionStorage.removeItem(SESSION_KEY);location.reload();}
+
+// SLOT STATE
+let _slotStates=["EMPTY","EMPTY","EMPTY","EMPTY"];
+let _slotPlates=["","","",""];
+const SLOT_MAP={EMPTY:"s-empty",OCCUPIED:"s-occupied",OCC:"s-occupied",RESERVED:"s-reserved"};
+const SLOT_LBL={EMPTY:"FREE",OCCUPIED:"OCCUPIED",OCC:"OCCUPIED",RESERVED:"RESERVED"};
+const SLOT_ICN={EMPTY:"🟢",OCCUPIED:"🔴",OCC:"🔴",RESERVED:"🟡"};
+const MINI_CLS={EMPTY:"empty",OCCUPIED:"occupied",OCC:"occupied",RESERVED:"reserved",reserved:"reserved"};
+
+function openSlotOverlay(){document.getElementById("slot-overlay").classList.add("open");renderBigSlots();}
+function closeSlotOverlay(){document.getElementById("slot-overlay").classList.remove("open");}
+
+function renderBigSlots(){
+  const html=_slotStates.map((st,i)=>{
+    const cls=SLOT_MAP[st]||"s-empty",label=SLOT_LBL[st]||"FREE",icon=SLOT_ICN[st]||"🟢";
+    return `<div class="big-slot ${cls}">
+      <span class="bs-icon">${icon}</span>
+      <div class="bs-num">${i+1}</div>
+      <div class="bs-status">${label}</div>
+      <div class="bs-plate">${_slotPlates[i]||"–"}</div>
+    </div>`;
+  }).join("");
+  const free=_slotStates.filter(s=>s==="EMPTY").length;
+  const occ=_slotStates.filter(s=>s==="OCCUPIED"||s==="OCC").length;
+  const res=_slotStates.filter(s=>s==="RESERVED").length;
+  const pct=Math.round((occ/Math.max(1,_slotStates.length))*100);
+  ["big-slot-grid","m-big-slot-grid"].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=html;});
+  [["sum-free","m-sum-free",free],["sum-occ","m-sum-occ",occ],["sum-res","m-sum-res",res],["sum-pct","m-sum-pct",pct+"%"]].forEach(([a,b,v])=>{
+    [a,b].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=v;});
+  });
+  const btn=document.getElementById("btn-slot-toggle");
+  if(btn){btn.textContent=`🅿 ${free}/${_slotStates.length} Free ▾`;
+    btn.className=free===0?"has-occ":(occ===0&&res===0?"all-free":"");}
+}
+
+function renderSlotsForLane(lane,statuses,slotsLeft,full){
+  if(lane!=="ENTRY")return;
+  if(statuses?.length)_slotStates=statuses;
+  const grid=document.getElementById("slot-entry");
+  if(grid){
+    grid.innerHTML="";let reserved=0;
+    _slotStates.forEach((st,i)=>{
+      const cls=MINI_CLS[st]||"empty";
+      const label=(st==="OCCUPIED"||st==="OCC")?"OCC":(st==="RESERVED"||st==="reserved")?"RES":"FREE";
+      if(st==="RESERVED")reserved++;
+      grid.innerHTML+=`<div class="slot ${cls}"><div style="font-size:16px;font-weight:900">${i+1}</div><div style="font-size:10px">${label}</div></div>`;
+    });
+    const left=slotsLeft??_slotStates.filter(s=>s==="EMPTY").length;
+    s("free-entry",left);s("res-count",`${reserved} res.`);
+  }
+  renderBigSlots();
+  if(full||(slotsLeft===0))addAlert("warn","🅿 Parking FULL");
+}
+function renderAllSlots(slots){
+  if(!slots?.ENTRY)return;
+  const raw=slots.ENTRY,arr=Array.isArray(raw)?raw:(Array.isArray(raw.slotStatus)?raw.slotStatus:[]);
+  const left=arr.filter(s=>s==="EMPTY").length;
+  renderSlotsForLane("ENTRY",arr,left,left===0);
+}
+
+// WS
+let ws=null,wsRetry=1000;
+function connectWS(){
+  try{ws=new WebSocket(WS_URL);}catch{return;}
+  const pill=document.getElementById("ws-pill");
+  ws.addEventListener("open",()=>{pill.className="pill pill-ok";pill.textContent="WS ●";wsRetry=1000;
+    setInterval(()=>{if(ws?.readyState===1)ws.send(JSON.stringify({type:"PING"}));},25000);});
+  ws.addEventListener("close",()=>{pill.className="pill pill-err";pill.textContent="WS ●";
+    setTimeout(connectWS,wsRetry=Math.min(wsRetry*2,30000));});
+  ws.addEventListener("message",e=>{try{handleWSMsg(JSON.parse(e.data));}catch{}});
+}
+function handleWSMsg(d){
+  switch(d.type){
+    case"SNAPSHOT":if(d.slots)renderAllSlots(d.slots);if(d.boards)renderBoards(d.boards);if(d.records?.length)renderRecordsTable(d.records.slice(0,100));break;
+    case"SLOT_UPDATE":renderSlotsForLane(d.lane,d.slotStatus,d.slotsLeft,d.parkingFull);break;
+    case"BOARD_STATUS":updateBoardDot(d.boardId,d.online,d);break;
+    case"NEW_ENTRY":prependRecord(d);if(d.slot>=1&&d.slot<=4){_slotPlates[d.slot-1]=d.plate||"";if(d.status==="reserved")_slotStates[d.slot-1]="RESERVED";else if(d.status==="parked")_slotStates[d.slot-1]="OCCUPIED";}renderBigSlots();loadStats();if(d.flagged)addAlert("err",`🚨 Blacklisted: ${d.plate}`);break;
+    case"SERIAL":appendSerial(d.boardId||"",d.line||"");break;
+    case"GATE_EVENT":addAlert("info",`🚧 Gate ${d.lane} ${d.event||""}`);break;
+    case"IR_TRIGGER":addAlert("info",`📡 IR ${d.lane}`);break;
+    case"BLACKLIST_ALERT":addAlert("err",`🚨 BLACKLISTED: ${d.plate} at ${d.lane}`);break;
+    case"BLACKLIST_UPDATE":renderBlacklist();break;
+  }
+}
+
+// BOARDS
+const boardsState={};
+function normBoard(b){return{online:!!b.online,ip:b.ip||"",wifiRssi:b.wifiRssi??b.wifi_rssi??null,
+  freeHeap:b.freeHeap??b.free_heap??null,uptimeSec:b.uptimeSec??b.uptime_sec??null,firmware:b.firmware||"",lane:b.lane||""};}
+function boardHTML(id,b){
+  const ut=b.uptimeSec?`up ${Math.floor(b.uptimeSec/60)}m`:"";
+  const hk=b.freeHeap?`${Math.round(b.freeHeap/1024)}KB`:"";
+  const rs=b.wifiRssi!=null?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${b.wifiRssi>-65?"rgba(16,185,129,.15)":"rgba(245,158,11,.15)"};color:${b.wifiRssi>-65?"var(--green)":"var(--yellow)"}">${b.wifiRssi}dBm</span>`:"";
+  return `<div class="board-row"><div class="dot ${b.online?"on":"off"}"></div>
+    <div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600">${id.replace("IPRS-","")}</div>
+    <div style="font-size:9px;color:var(--muted)">${b.ip}${hk?" · "+hk:""}${ut?" · "+ut:""}</div></div>${rs}</div>`;
+}
+function renderBoards(snap){Object.entries(snap).forEach(([id,b])=>{boardsState[id]=normBoard(b);});refreshBoardList();}
+function updateBoardDot(boardId,online,raw){boardsState[boardId]={...(boardsState[boardId]||{}),...normBoard(raw||{}),online};refreshBoardList();}
+function refreshBoardList(){
+  const entries=Object.entries(boardsState);
+  const html=entries.map(([id,b])=>boardHTML(id,b)).join("");
+  [["board-list","board-empty-msg"],["m-board-list",null]].forEach(([lid,eid])=>{
+    const el=document.getElementById(lid);if(!el)return;
+    el.querySelectorAll(".board-row").forEach(n=>n.remove());
+    if(!entries.length){const em=eid?document.getElementById(eid):null;if(em)em.style.display="";}
+    else{const em=eid?document.getElementById(eid):null;if(em)em.style.display="none";el.insertAdjacentHTML("beforeend",html);}
+  });
+}
+// FIX: CAM IP was hardcoded to 10.121.81.150 — wrong, CAM IP is DHCP-assigned.
+// Server now resolves the CAM IP dynamically via /status/cam endpoint.
+// Fallback: use SERVER_IP subnet with port 8080 (works when CAM is on same AP).
+const BOARD_HTTP=[
+  {id:"IPRS-WROOM", url:`http://${SERVER_IP}:8081/status`},
+  {id:"IPRS-CAM",   url:`http://${SERVER_IP.replace(/\.\d+$/,".150")}:8080/status`,
+   // ↑ tries .150 as heuristic; owner should set CAM_IP below if different
+   fallbackFn: async ()=>{
+     try{const j=await fetch(`${API}/status/cam`,{signal:AbortSignal.timeout(2000)}).then(r=>r.json());
+       return j.ip?`http://${j.ip}:8080/status`:null;}catch{return null;}}}
+];
+async function pingBoard(t){
+  // FIX: Try primary URL first; for CAM board use server-resolved IP as fallback
+  let url = t.url;
+  try{
+    // If board has a fallback resolver (CAM uses dynamic IP), try to get real URL first
+    if(t.fallbackFn){
+      const resolved = await t.fallbackFn();
+      if(resolved) url = resolved;
+    }
+    const j=await fetch(url,{signal:AbortSignal.timeout(3000)}).then(r=>r.json());
+    boardsState[t.id]=normBoard({...j,online:true});
+  }
+  catch{boardsState[t.id]={...(boardsState[t.id]||{}),online:false};}
+  refreshBoardList();
+}
+async function pingAllBoards(btnId){
+  const btn=document.getElementById(btnId);if(btn){btn.textContent="⟳ Pinging…";btn.disabled=true;}
+  await Promise.all(BOARD_HTTP.map(pingBoard));
+  if(btn){btn.textContent="⟳ Ping All";btn.disabled=false;}toast("Boards polled","ok");
+}
+setInterval(()=>{if(document.getElementById("ws-pill")?.classList.contains("pill-err"))BOARD_HTTP.forEach(pingBoard);},15000);
+
+// BLACKLIST
+const BL_KEY="iprs_v10_blacklist";
+function loadBL(){try{return JSON.parse(localStorage.getItem(BL_KEY)||"[]");}catch{return[];}}
+function saveBL(l){localStorage.setItem(BL_KEY,JSON.stringify(l));}
+function renderBlacklist(){
+  const list=loadBL();
+  [["bl-list","bl-empty-msg"],["m-bl-list","m-bl-empty-msg"]].forEach(([cid,eid])=>{
+    const con=document.getElementById(cid);if(!con)return;
+    con.querySelectorAll(".bl-tag").forEach(n=>n.remove());
+    const emp=document.getElementById(eid);
+    if(!list.length){if(emp)emp.style.display="";return;}
+    if(emp)emp.style.display="none";
+    list.forEach(plate=>{const tag=document.createElement("div");tag.className="bl-tag";
+      tag.innerHTML=`${plate}<button onclick="removeFromBL('${plate}')" title="Remove">✕</button>`;con.appendChild(tag);});
+  });
+}
+function addToBlacklist(plateArg){
+  const inp=document.getElementById("bl-plate-input");
+  const plate=(plateArg||inp?.value||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if(!plate||plate.length<3){toast("Min 3 chars","err");return;}
+  const list=loadBL();if(list.includes(plate)){toast(`${plate} already listed`,"err");return;}
+  list.push(plate);saveBL(list);renderBlacklist();if(inp)inp.value="";
+  fetch(`${API}/blacklist`,{method:"POST",headers:{"Content-Type":"application/json","X-Api-Key":API_KEY},body:JSON.stringify({plate,action:"add"})}).catch(()=>{});
+  toast(`${plate} blacklisted`,"ok");filterTable();
+}
+function mAddBL(){const inp=document.getElementById("m-bl-plate-input");addToBlacklist(inp?.value||"");if(inp)inp.value="";}
+function removeFromBL(plate){
+  saveBL(loadBL().filter(p=>p!==plate));renderBlacklist();
+  fetch(`${API}/blacklist`,{method:"POST",headers:{"Content-Type":"application/json","X-Api-Key":API_KEY},body:JSON.stringify({plate,action:"remove"})}).catch(()=>{});
+  toast(`${plate} removed`,"ok");filterTable();
+}
+function toggleFlag(plate,btnEl){
+  if(loadBL().includes(plate)){removeFromBL(plate);if(btnEl){btnEl.className="btn-flag-toggle clear";btnEl.textContent="Flag";}}
+  else{addToBlacklist(plate);if(btnEl){btnEl.className="btn-flag-toggle flagged";btnEl.textContent="🚩 FLAG";}}
+}
+
+// GATE
+async function gateCmd(lane,action){
+  try{
+    const d=await fetch(`${API}/gate/${action}`,{method:"POST",headers:{"Content-Type":"application/json","X-Api-Key":API_KEY},body:JSON.stringify({lane})}).then(r=>r.json());
+    toast(`Gate ${lane} ${action} → ${d.status||"sent"}`,"ok");
+    try{navigator.vibrate&&navigator.vibrate([30,20,60]);}catch{}
+  }catch(e){toast("Gate failed: "+e.message,"err");}
+}
+
+// STATS
+async function loadStats(){
+  try{
+    const {records=[]}=await fetch(`${API}/records`).then(r=>r.json()).catch(()=>({records:[]}));
+    const today=new Date().toISOString().slice(0,10);
+    const todayRecs=records.filter(r=>(r.entryTime||"").startsWith(today));
+    const parked=records.filter(r=>r.status==="parked"||r.status==="reserved");
+    const exited=todayRecs.filter(r=>r.status==="exited");
+    const overstay=records.filter(r=>r.overstay).length;
+    const bl=new Set(loadBL());
+    const flagged=records.filter(r=>r.flagged||bl.has((r.plateText||"").toUpperCase())).length;
+    const totalRev=exited.reduce((a,r)=>a+(r.paymentAmount||0),0);
+    const avgDur=exited.length?Math.round(exited.reduce((a,r)=>{
+      if(!r.entryTime||!r.exitTime||r.exitTime==="---")return a;
+      return a+(new Date(r.exitTime)-new Date(r.entryTime))/60000;},0)/exited.length):0;
+    const slotCnt={};todayRecs.forEach(r=>{slotCnt[r.slotNumber]=(slotCnt[r.slotNumber]||0)+1;});
+    const topSlot=Object.keys(slotCnt).sort((a,b)=>slotCnt[b]-slotCnt[a])[0];
+    parked.forEach(r=>{if(r.slotNumber>=1&&r.slotNumber<=4)_slotPlates[r.slotNumber-1]=r.plateText||"";});
+    [["kpi-tokens","m-kpi-tokens",Math.round(totalRev/10)],["kpi-sessions","m-kpi-sessions",parked.length],
+     ["kpi-entries","m-kpi-entries",todayRecs.length],["kpi-overstay","m-kpi-overstay",overstay],
+     ["stat-revenue","m-stat-rev",`₹${totalRev.toFixed(0)}`],["stat-avg-dur","m-stat-dur",avgDur+"m"],
+     ["stat-top-slot","m-stat-slot",topSlot?`#${topSlot}`:"–"],["stat-flagged","m-stat-flag",flagged]
+    ].forEach(([a,b,v])=>{[a,b].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=v;});});
+    const pct=Math.min(100,Math.round((totalRev/REV_TARGET)*100))+"%";
+    ["rev-bar","m-rev-bar"].forEach(id=>{const e=document.getElementById(id);if(e)e.style.width=pct;});
+    buildChart(todayRecs,"hourly-chart","bar");
+    buildChart(todayRecs,"m-hourly-chart","bar");
+    buildRevChart(records,"revenue-chart");
+    buildRevChart(records,"m-revenue-chart");
+    renderRecordsTable(records.slice(0,100));
+    if(overstay>0)addAlert("warn",`⏱ ${overstay} overstay`);
+    if(flagged>0)addAlert("err",`🚨 ${flagged} flagged`);
+  }catch(e){console.warn(e);}
+}
+
+// CHARTS
+const _charts={};
+const CO={responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},
+  scales:{x:{grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"#64748b",font:{size:9}}},
+          y:{grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"#64748b",font:{size:9}}}}};
+function buildChart(recs,canvasId){
+  const c=new Array(24).fill(0);
+  (recs||[]).forEach(r=>{const h=new Date(r.entryTime||0).getHours();if(h>=0&&h<24)c[h]++;});
+  const el=document.getElementById(canvasId);if(!el)return;
+  if(_charts[canvasId])_charts[canvasId].destroy();
+  _charts[canvasId]=new Chart(el.getContext("2d"),{type:"bar",
+    data:{labels:Array.from({length:24},(_,i)=>`${i}`),
+      datasets:[{data:c,backgroundColor:"rgba(59,130,246,.45)",borderColor:"#3b82f6",borderWidth:1,borderRadius:3}]},
+    options:CO});
+}
+function buildRevChart(recs,canvasId){
+  const el=document.getElementById(canvasId);if(!el)return;
+  const days=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d.toISOString().slice(0,10);});
+  const rev=days.map(day=>recs.filter(r=>(r.entryTime||"").startsWith(day)&&r.status==="exited").reduce((a,r)=>a+(r.paymentAmount||0),0));
+  if(_charts[canvasId])_charts[canvasId].destroy();
+  _charts[canvasId]=new Chart(el.getContext("2d"),{type:"line",
+    data:{labels:days.map(d=>d.slice(5)),datasets:[{data:rev,fill:true,backgroundColor:"rgba(245,158,11,.12)",
+      borderColor:"#f59e0b",borderWidth:2,tension:.4,pointRadius:3,pointBackgroundColor:"#f59e0b"}]},options:CO});
+}
+
+// RECORDS
+let allRecords=[];
+function renderRecordsTable(r){allRecords=r;filterTable();}
+function filterTable(){
+  const q=((document.getElementById("search")||document.getElementById("m-search"))?.value||"").toLowerCase();
+  const st=((document.getElementById("status-filter")||document.getElementById("m-status-filter"))?.value||"").toLowerCase();
+  const bl=new Set(loadBL());
+  const filtered=allRecords.filter(r=>(!q||(r.plateText||"").toLowerCase().includes(q))&&(!st||(r.status||"")===st));
+  const tbody=document.getElementById("records-body");
+  if(tbody)tbody.innerHTML=filtered.map(r=>{
+    const c=r.ocrConfidence||0,cc=c>=85?"conf-high":c>=60?"conf-mid":"conf-low";
+    const flag=r.flagged||bl.has((r.plateText||"").toUpperCase());
+    const img=r.plateImageUrl?`<img class="thumb" src="${API}${r.plateImageUrl}" loading="lazy" onclick="openModal('${API}${r.plateImageUrl}','${r.plateText}')">`
+      :`<div style="width:44px;height:30px;background:var(--bg4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted)">N/A</div>`;
+    return `<tr><td style="color:var(--muted)">${r.id}</td><td>${img}</td>
+      <td class="plate-cell">${r.plateText||"UNDETECTED"}</td>
+      <td style="color:var(--muted)">${(r.entryTime||"").slice(0,16)}</td>
+      <td style="color:var(--muted)">${r.exitTime==="---"?"–":(r.exitTime||"").slice(0,16)}</td>
+      <td style="text-align:center">${r.slotNumber||"–"}</td>
+      <td style="color:var(--muted)">${r.duration||"–"}</td>
+      <td style="color:var(--green)">₹${(r.paymentAmount||0).toFixed(0)}</td>
+      <td class="${cc}">${c.toFixed(0)}%</td>
+      <td><span class="status-badge ${r.status}">${r.status}</span></td>
+      <td>${flag?`<button class="btn-flag-toggle flagged" onclick="toggleFlag('${r.plateText}',this)">🚩 FLAG</button>`:`<button class="btn-flag-toggle clear" onclick="toggleFlag('${r.plateText}',this)">Flag</button>`}</td></tr>`;
+  }).join("");
+  const mhtml=filtered.map(r=>{
+    const flag=r.flagged||bl.has((r.plateText||"").toUpperCase()),c=r.ocrConfidence||0;
+    const cc=c>=85?"var(--green)":c>=60?"var(--yellow)":"var(--red)";
+    const imgEl=r.plateImageUrl?`<img class="rc-img" src="${API}${r.plateImageUrl}" loading="lazy" onclick="openModal('${API}${r.plateImageUrl}','${r.plateText}')">`:`<div class="rc-img-ph">N/A</div>`;
+    return `<div class="rec-card"><div class="rc-top">${imgEl}
+      <div style="flex:1;min-width:0"><div class="rc-plate">${r.plateText||"UNDETECTED"}</div>
+      <div class="rc-time">${(r.entryTime||"").slice(0,16)}</div></div>
+      <span class="status-badge ${r.status}" style="align-self:flex-start">${r.status}</span></div>
+      <div class="rc-grid">
+        <div class="rc-cell"><div class="k">Slot</div><div class="v">${r.slotNumber||"–"}</div></div>
+        <div class="rc-cell"><div class="k">Duration</div><div class="v">${r.duration||"–"}</div></div>
+        <div class="rc-cell"><div class="k">Revenue</div><div class="v" style="color:var(--green)">₹${(r.paymentAmount||0).toFixed(0)}</div></div>
+        <div class="rc-cell"><div class="k">Confidence</div><div class="v" style="color:${cc}">${c.toFixed(0)}%</div></div>
+      </div>
+      <div class="rc-bottom"><span style="font-size:11px;color:var(--muted)">Exit: ${r.exitTime==="---"?"Active":(r.exitTime||"").slice(0,16)}</span>
+        ${flag?`<button class="btn-flag-toggle flagged" onclick="toggleFlag('${r.plateText}',this)">🚩 FLAG</button>`:`<button class="btn-flag-toggle clear" onclick="toggleFlag('${r.plateText}',this)">Flag</button>`}
+      </div></div>`;
+  }).join("");
+  ["records-cards","m-records-cards"].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=mhtml;});
+}
+function prependRecord(d){
+  allRecords.unshift({id:d.id,plateText:d.plate,entryTime:d.ts,exitTime:"---",slotNumber:d.slot,
+    status:d.status||"parked",ocrConfidence:d.confidence||0,flagged:d.flagged||0,plateImageUrl:d.imageUrl||"",paymentAmount:0});
+  filterTable();
+}
+function exportCSV(){
+  if(!allRecords.length){toast("No records","err");return;}
+  const hdr="ID,Plate,Entry,Exit,Slot,Duration,Payment,Confidence,Status\n";
+  const rows=allRecords.map(r=>`${r.id},"${r.plateText||""}","${r.entryTime||""}","${r.exitTime||""}",${r.slotNumber||""},"${r.duration||""}",${r.paymentAmount||0},${(r.ocrConfidence||0).toFixed(1)},${r.status}`).join("\n");
+  const a=document.createElement("a");a.download=`IPRS-Records-${new Date().toISOString().slice(0,10)}.csv`;
+  a.href=URL.createObjectURL(new Blob([hdr+rows],{type:"text/csv"}));a.click();toast("CSV exported","ok");
+}
+
+// CHAIN
+async function sha256(str){const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(str));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");}
+async function verifyChain(){
+  const pill=document.getElementById("chain-pill");if(!pill)return;
+  pill.textContent="⛓ …";
+  const keys=Object.keys(localStorage).filter(k=>k.startsWith("iprs_customer")||k.startsWith("iprs_ledger_"));
+  if(!keys.length){
+    pill.className="pill pill-ok";pill.textContent="⛓ No ledger";
+    const msg=`<div class="chain-row chain-ok"><span class="chain-icon">✅</span><span class="chain-label">No customer ledgers found</span></div>`;
+    ["chain-detail","m-chain-detail"].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=msg;});return;
+  }
+  let ok=0,broken=0;
+  for(const k of keys){
+    try{const ledger=(JSON.parse(localStorage.getItem(k)||"{}")).ledger||[];let prev="GENESIS",bad=false;
+      for(const e of ledger){const raw=`${prev}|${e.type}|${e.amount}|${e.balAfter}|${e.ts}`;
+        if(await sha256(raw)!==e.hash){bad=true;broken++;break;}prev=e.hash;}if(!bad)ok++;}catch{broken++;}
+  }
+  const allOk=broken===0;
+  pill.className=`pill ${allOk?"pill-ok":"pill-err"}`;pill.textContent=allOk?"⛓ Chain OK":"⛓ Chain ERR";
+  const msg=`<div class="chain-row ${allOk?"chain-ok":"chain-err"}"><span class="chain-icon">${allOk?"✅":"🔴"}</span><span class="chain-label">${keys.length} ledger(s) — ${broken} broken</span></div>`;
+  ["chain-detail","m-chain-detail"].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=msg;});
+}
+
+// SERIAL
+const MAX_SER=200;let serialLines=[];
+function appendSerial(bid,line){
+  serialLines.push({boardId:bid,line,ts:new Date().toLocaleTimeString()});
+  if(serialLines.length>MAX_SER)serialLines.shift();renderSerial();
+}
+function renderSerial(){
+  const f=(document.getElementById("serial-filter")?.value||"").toLowerCase();
+  const auto=document.getElementById("autoscroll")?.checked;
+  const html=serialLines.filter(l=>!f||l.line.toLowerCase().includes(f)||l.boardId.toLowerCase().includes(f)).map(l=>{
+    const cls=l.line.includes("[ERR]")||l.line.includes("FAIL")?"err":l.line.includes("[WARN]")||l.line.includes("LOST")?"warn":l.line.includes("OK")||l.line.includes("Connected")?"ok":"";
+    return `<div class="slog ${cls}"><span class="ts">${l.ts}</span><span class="bid">${l.boardId.replace("IPRS-","")}</span>${esc(l.line)}</div>`;
+  }).join("");
+  ["serial-box","m-serial-box"].forEach(id=>{const b=document.getElementById(id);if(!b)return;b.innerHTML=html;if(auto)b.scrollTop=b.scrollHeight;});
+}
+function startSSE(){const es=new EventSource(`${API}/serial/stream`);es.onmessage=e=>{try{const d=JSON.parse(e.data);appendSerial(d.boardId||"",d.line||"");}catch{}};}
+
+// ALERTS
+const alertSet=new Set();
+function addAlert(type,msg){
+  if(alertSet.has(msg))return;alertSet.add(msg);setTimeout(()=>alertSet.delete(msg),60000);
+  ["alerts-list","m-alerts-list"].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const div=document.createElement("div");div.className=`alert-item ${type}`;div.textContent=msg;
+    if(el.firstChild?.textContent==="System nominal")el.innerHTML="";
+    el.prepend(div);if(el.children.length>8)el.lastChild?.remove();
+  });
+}
+
+// UTILS
+const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+let _tt=null;
+function toast(msg,type="info"){const el=document.getElementById("toast");el.textContent=msg;el.className="show "+type;clearTimeout(_tt);_tt=setTimeout(()=>{el.className="";},2800);}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function updateClock(){const e=document.getElementById("clock");if(e)e.textContent=new Date().toLocaleTimeString();}
+function openModal(src,cap){document.getElementById("modal-img").src=src;document.getElementById("modal-caption").textContent=cap;document.getElementById("img-modal").classList.add("open");}
+function closeModal(){document.getElementById("img-modal").classList.remove("open");}
+let darkMode=true;
+function toggleTheme(){darkMode=!darkMode;document.documentElement.setAttribute("data-theme",darkMode?"dark":"light");
+  ["theme-toggle","m-theme-toggle"].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=darkMode?"☀":"🌙 Dark";});}
+
+function switchMobileTab(idx){
+  document.querySelectorAll(".mpanel").forEach((p,i)=>p.classList.toggle("active",i===idx));
+  document.querySelectorAll(".mtab").forEach((t,i)=>t.classList.toggle("active",i===idx));
+  if(idx===0&&allRecords.length){const today=new Date().toISOString().slice(0,10);buildChart(allRecords.filter(r=>(r.entryTime||"").startsWith(today)),"m-hourly-chart");}
+}
+
+function bootDashboard(){
+  connectWS();loadStats();startSSE();
+  setInterval(loadStats,10000);setInterval(updateClock,1000);
+  updateClock();verifyChain();renderBigSlots();
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  document.getElementById("btn-login").addEventListener("click",doLogin);
+  document.getElementById("btn-logout").addEventListener("click",doLogout);
+  document.getElementById("m-btn-logout")?.addEventListener("click",doLogout);
+  document.getElementById("lu").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("lp").focus();});
+  document.getElementById("lp").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
+  document.getElementById("theme-toggle").addEventListener("click",toggleTheme);
+  document.getElementById("m-theme-toggle")?.addEventListener("click",toggleTheme);
+  document.getElementById("chain-pill").addEventListener("click",verifyChain);
+  document.getElementById("btn-verify-chain")?.addEventListener("click",verifyChain);
+  document.getElementById("m-btn-verify-chain")?.addEventListener("click",verifyChain);
+  document.getElementById("btn-slot-toggle").addEventListener("click",openSlotOverlay);
+  document.getElementById("mini-expand")?.addEventListener("click",openSlotOverlay);
+  document.getElementById("btn-close-slot").addEventListener("click",closeSlotOverlay);
+  document.getElementById("slot-overlay").addEventListener("click",e=>{if(e.target===document.getElementById("slot-overlay"))closeSlotOverlay();});
+  [["entry-open","ENTRY","open"],["entry-close","ENTRY","close"],["exit-open","EXIT","open"],["exit-close","EXIT","close"],
+   ["m-entry-open","ENTRY","open"],["m-entry-close","ENTRY","close"],["m-exit-open","EXIT","open"],["m-exit-close","EXIT","close"]
+  ].forEach(([id,lane,action])=>document.getElementById(id)?.addEventListener("click",()=>gateCmd(lane,action)));
+  document.getElementById("btn-csv")?.addEventListener("click",exportCSV);
+  document.getElementById("m-btn-csv")?.addEventListener("click",exportCSV);
+  document.getElementById("btn-refresh")?.addEventListener("click",loadStats);
+  ["search","m-search"].forEach(id=>document.getElementById(id)?.addEventListener("input",filterTable));
+  ["status-filter","m-status-filter"].forEach(id=>document.getElementById(id)?.addEventListener("change",filterTable));
+  document.getElementById("btn-close-modal").addEventListener("click",closeModal);
+  document.getElementById("img-modal").addEventListener("click",e=>{if(e.target===document.getElementById("img-modal"))closeModal();});
+  document.getElementById("serial-filter")?.addEventListener("input",renderSerial);
+  document.getElementById("btn-clear-serial")?.addEventListener("click",()=>{serialLines=[];renderSerial();});
+  document.getElementById("m-btn-clear-serial")?.addEventListener("click",()=>{serialLines=[];renderSerial();});
+  document.getElementById("btn-ping-all")?.addEventListener("click",()=>pingAllBoards("btn-ping-all"));
+  document.getElementById("m-btn-ping-all")?.addEventListener("click",()=>pingAllBoards("m-btn-ping-all"));
+  document.querySelectorAll(".mtab").forEach(t=>t.addEventListener("click",()=>switchMobileTab(+t.dataset.tab)));
+  renderBlacklist();BOARD_HTTP.forEach(pingBoard);
+  if(isLoggedIn()){document.getElementById("login-overlay").style.display="none";bootDashboard();}
+});
+</script>
+</body>
+</html>

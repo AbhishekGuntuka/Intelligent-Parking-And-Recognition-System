@@ -1,0 +1,1800 @@
+<!DOCTYPE html>
+<!--
+  Project  : IPRS — Intelligent Parking & Recognition System
+  File     : customer_dashboard.html
+  Purpose  : Customer wallet, booking, live tracking & receipts — 5-tab SPA
+  Hardware : Browser (served by Flask or opened directly)
+  Modified : 2026-03-21
+  Merges   : iprs_customer_v1 + iprs_smartcoin_customer — best of both
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#0b0f1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>IPRS SmartCoin™ — Customer</title>
+<script src="/static/qrcode.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'"></script>
+<script src="/static/html2canvas.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'"></script>
+<style>
+:root{
+  --bg:#0b0f1a;--bg2:#111827;--bg3:#1a2133;--bg4:#1f2940;
+  --border:#1e2d45;--border2:#2a3f5f;
+  --accent:#3b82f6;--accent2:#8b5cf6;--accent3:#06b6d4;
+  --coin:#f59e0b;--coin2:#fbbf24;--coin-glow:rgba(245,158,11,.22);
+  --green:#10b981;--red:#ef4444;--yellow:#f59e0b;
+  --text:#e2e8f0;--muted:#64748b;--white:#fff;
+  --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono','Fira Mono',monospace;
+  --sh:0 4px 24px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* NAV */
+nav{background:var(--bg2);border-bottom:1px solid var(--border);height:52px;padding:0 18px;
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:200}
+.nav-logo{font-size:16px;font-weight:800;color:var(--white)}
+.nav-logo span{color:var(--coin)}
+#nav-balance{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);
+  padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;color:var(--coin)}
+.spacer{flex:1}
+#chain-badge{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:700;cursor:pointer;
+  user-select:none;transition:.15s}
+#chain-badge.ok{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25)}
+#chain-badge.err{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+#chain-badge.spin-badge{background:rgba(100,116,139,.1);color:var(--muted);border:1px solid var(--border)}
+
+/* TABS */
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);
+  overflow-x:auto;position:sticky;top:52px;z-index:100;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;padding:12px 16px;font-size:12px;font-weight:600;color:var(--muted);
+  border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:.15s}
+.tab.active{color:var(--coin);border-bottom-color:var(--coin)}
+.tab:hover:not(.active){color:var(--text)}
+
+/* PANELS */
+.panel{display:none;padding:20px;max-width:520px;margin:0 auto;padding-bottom:80px}
+.panel.active{display:block}
+
+/* ── WALLET PANEL ─────────────────────────────────────── */
+.balance-card{background:linear-gradient(135deg,#1a2133 0%,#1f2d4a 100%);
+  border:1px solid var(--border2);border-radius:18px;padding:28px 24px;
+  text-align:center;margin-bottom:18px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.balance-card::before{content:'';position:absolute;top:-40px;right:-40px;
+  width:160px;height:160px;background:var(--coin-glow);border-radius:50%;filter:blur(40px);pointer-events:none}
+.balance-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:8px}
+.balance-amount{font-size:54px;font-weight:900;color:var(--coin);line-height:1;
+  font-variant-numeric:tabular-nums;transition:.4s}
+.balance-unit{font-size:15px;color:var(--coin);margin-left:6px;font-weight:700}
+.balance-sub{font-size:12px;color:var(--muted);margin-top:8px}
+.tier-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;
+  border-radius:20px;font-size:12px;font-weight:700;margin-top:12px}
+.tier-BRONZE{background:rgba(180,120,60,.15);border:1px solid rgba(180,120,60,.3);color:#cd7f32}
+.tier-SILVER{background:rgba(160,160,180,.12);border:1px solid rgba(160,160,180,.3);color:#c0c0c0}
+.tier-GOLD{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:var(--coin)}
+.tier-PLATINUM{background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);color:#a78bfa}
+.tier-DIAMOND{background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);color:var(--accent3)}
+.tier-progress{margin-top:14px}
+.tier-bar-bg{background:rgba(255,255,255,.07);border-radius:8px;height:6px;overflow:hidden;margin-top:6px}
+.tier-bar-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--coin),var(--coin2));transition:.6s}
+.tier-prog-row{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.stat-mini{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px}
+.stat-mini .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.stat-mini .val{font-size:22px;font-weight:800;color:var(--white)}
+.stat-mini .val.green{color:var(--green)}.stat-mini .val.amber{color:var(--coin)}.stat-mini .val.purple{color:#a78bfa}
+
+/* ── BOOK PANEL ───────────────────────────────────────── */
+.section-label{font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;
+  display:flex;align-items:center;gap:6px}
+.section-label .hint{font-size:10px;color:var(--muted);font-weight:400}
+
+.slot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.slot-card{border:2px solid var(--border);border-radius:12px;padding:16px 12px;text-align:center;
+  cursor:pointer;transition:.18s;position:relative;background:var(--bg3)}
+.slot-card:hover:not(.disabled){border-color:var(--accent2);transform:translateY(-2px)}
+.slot-card.selected{border-color:var(--coin);background:rgba(245,158,11,.06)}
+.slot-card.occ{opacity:.45;cursor:not-allowed;border-color:rgba(239,68,68,.25)}
+.slot-card.reserved{opacity:.55;cursor:not-allowed;border-color:rgba(245,158,11,.25)}
+.slot-num{font-size:28px;font-weight:800;color:var(--white)}
+.slot-type-label{font-size:10px;color:var(--muted);margin:3px 0}
+.slot-mul-badge{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;display:inline-block;margin-top:3px}
+.mul-standard{background:rgba(16,185,129,.12);color:var(--green)}
+.mul-premium{background:rgba(245,158,11,.12);color:var(--coin)}
+.mul-ev{background:rgba(6,182,212,.12);color:var(--accent3)}
+.slot-state{font-size:10px;font-weight:700;margin-top:4px}
+.state-free{color:var(--green)}.state-occ{color:var(--red)}.state-res{color:var(--yellow)}
+
+.time-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.field label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:5px}
+.field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:.15s}
+.field input:focus{border-color:var(--accent)}
+
+.fare-preview{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;
+  padding:14px;margin-bottom:14px}
+.fare-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;
+  border-bottom:1px solid var(--border)}
+.fare-row:last-child{border-bottom:none}
+.fare-row .lbl{color:var(--muted)}
+.fare-row.total{font-weight:700;font-size:13px;color:var(--coin)}
+.fare-row.penalty{color:var(--red)}.fare-row.discount{color:var(--green)}
+.warn-strip{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);
+  border-radius:8px;padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:10px}
+
+/* ── ACTIVE PANEL ─────────────────────────────────────── */
+.no-booking-msg{text-align:center;padding:60px 20px;color:var(--muted)}
+.no-booking-msg .icon{font-size:48px;margin-bottom:12px}
+.active-card{background:var(--bg3);border:1px solid var(--border2);border-radius:14px;
+  padding:20px;margin-bottom:14px}
+.ab-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.ab-slot-big{font-size:32px;font-weight:900;color:var(--white)}
+.status-pill{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.status-active{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.info-row{display:flex;justify-content:space-between;padding:6px 0;
+  border-bottom:1px solid var(--border);font-size:12px}
+.info-row:last-of-type{border-bottom:none}
+.info-row .k{color:var(--muted)}.info-row .v{font-weight:600;color:var(--text)}
+.cost-meter{background:var(--bg);border:1px solid var(--border);border-radius:10px;
+  padding:14px;text-align:center;margin:14px 0}
+.cost-meter .cm-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.live-cost{font-size:36px;font-weight:900;color:var(--coin);font-variant-numeric:tabular-nums;transition:.3s}
+.cost-meter .cm-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.countdown-wrap{display:flex;flex-direction:column;align-items:center;margin:14px 0}
+.c-ring{position:relative;width:100px;height:100px}
+.c-ring svg{transform:rotate(-90deg)}
+.c-track{fill:none;stroke:var(--border);stroke-width:6}
+.c-fill{fill:none;stroke:var(--accent3);stroke-width:6;stroke-linecap:round;
+  stroke-dasharray:283;transition:stroke-dasharray .5s}
+.c-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:800;color:var(--accent3);font-family:var(--mono)}
+.c-label{font-size:11px;color:var(--muted);margin-top:6px}
+.inline-row{display:flex;gap:12px;align-items:center}
+
+/* ── HISTORY PANEL ────────────────────────────────────── */
+.filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filter-row select,.filter-row input{flex:1;min-width:120px;background:var(--bg);
+  border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);
+  font-size:12px;outline:none}
+.txn-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.txn-item:hover{border-color:var(--border2)}
+.txn-header{display:flex;align-items:center;gap:10px}
+.txn-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:15px;flex-shrink:0}
+.txn-icon.mint{background:rgba(16,185,129,.15)}.txn-icon.deduct{background:rgba(239,68,68,.12)}
+.txn-icon.refund{background:rgba(6,182,212,.12)}.txn-icon.book{background:rgba(139,92,246,.12)}
+.txn-info{flex:1}
+.txn-action{font-size:12px;font-weight:700;color:var(--text)}
+.txn-time{font-size:10px;color:var(--muted);margin-top:2px}
+.txn-amount{font-size:15px;font-weight:800;font-family:var(--mono)}
+.txn-amount.pos{color:var(--green)}.txn-amount.neg{color:var(--red)}
+.txn-detail{display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.txn-detail.open{display:block}
+.txn-detail-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:var(--muted)}
+.hash-mono{font-size:9px;color:var(--muted);font-family:var(--mono);background:var(--bg);
+  border-radius:4px;padding:4px 6px;margin-top:6px;word-break:break-all}
+
+/* ── RECEIPTS PANEL ───────────────────────────────────── */
+.receipt-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.receipt-item:hover{border-color:var(--border2)}
+.rcpt-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.rcpt-id{font-size:10px;font-family:var(--mono);color:var(--muted)}
+.rcpt-amount{font-size:16px;font-weight:800;color:var(--coin)}
+.rcpt-meta{font-size:11px;color:var(--muted);display:flex;gap:12px}
+
+/* ── BUTTONS ──────────────────────────────────────────── */
+.btn{border:none;border-radius:10px;padding:12px 16px;cursor:pointer;font-size:13px;
+  font-weight:700;transition:.18s;display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.slot-card{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.tab{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.btn-coin{background:linear-gradient(135deg,#d97706,#f59e0b);color:#000}
+.btn-coin:hover:not(:disabled){filter:brightness(1.1)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:#2563eb}
+.btn-ghost{background:var(--bg3);border:1px solid var(--border);color:var(--muted)}
+.btn-ghost:hover:not(:disabled){border-color:var(--accent);color:var(--text)}
+.btn-green{background:linear-gradient(135deg,#059669,#10b981);color:#fff}
+.btn-green:hover:not(:disabled){filter:brightness(1.1)}
+.btn-red{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.28);color:var(--red)}
+.btn-red:hover:not(:disabled){background:rgba(239,68,68,.22)}
+.btn-row{display:flex;gap:8px}
+.btn-row .btn{flex:1}
+.stack{display:flex;flex-direction:column;gap:8px}
+
+/* ── MODALS ───────────────────────────────────────────── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;
+  align-items:center;justify-content:center;padding:16px}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;
+  padding:22px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-shadow:var(--sh)}
+.modal-title{font-size:16px;font-weight:800;color:var(--white);margin-bottom:16px;
+  display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px}
+#qr-box{display:flex;justify-content:center;margin:14px 0}
+#qr-box canvas{border-radius:8px}
+.token-mono{background:var(--bg);border-radius:6px;padding:8px 10px;font-size:10px;
+  font-family:var(--mono);color:var(--muted);word-break:break-all;text-align:center;margin-bottom:12px}
+
+/* ── TOAST ────────────────────────────────────────────── */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(40px);
+  background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 18px;
+  font-size:13px;font-weight:600;box-shadow:var(--sh);opacity:0;transition:.3s;z-index:600;white-space:nowrap;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+#toast.ok{border-color:var(--green);color:var(--green)}
+#toast.err{border-color:var(--red);color:var(--red)}
+#toast.info{border-color:var(--accent);color:var(--accent)}
+#toast.coin{border-color:var(--coin);color:var(--coin)}
+
+/* ── RECEIPT PRINT TEMPLATE ───────────────────────────── */
+#receipt-print-tpl{display:none}
+@media print{
+  body *{display:none!important}
+  #receipt-print-tpl{display:block!important;font-family:monospace;font-size:12px;
+    color:#000;background:#fff;padding:20px;width:320px;margin:0 auto}
+  .rp-border{border:1px solid #000;padding:16px}
+  .rp-title{text-align:center;font-weight:700;font-size:14px;margin-bottom:10px}
+  .rp-div{border-top:1px solid #aaa;margin:8px 0}
+  .rp-row{display:flex;justify-content:space-between;padding:2px 0;font-size:11px}
+  .rp-total{font-weight:700;font-size:13px}
+}
+
+/* ── MOBILE RESPONSIVE ──────────────────────────────────── */
+@media(max-width:600px){
+  nav{padding:0 12px;height:48px}
+  .nav-logo{font-size:14px}
+  #nav-balance{font-size:10px;padding:2px 8px}
+  #chain-badge{font-size:10px;padding:2px 7px}
+  .tabs{top:48px}
+  .tab{padding:10px 12px;font-size:11px}
+  .panel{padding:14px;padding-bottom:80px}
+  .balance-amount{font-size:44px}
+  .balance-card{padding:22px 16px}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .stat-mini{padding:10px}
+  .stat-mini .val{font-size:18px}
+  .slot-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .slot-card{padding:12px 8px}
+  .slot-num{font-size:22px}
+  .time-row{grid-template-columns:1fr;gap:8px}
+  .time-row .field input{font-size:14px;padding:10px 12px;min-height:44px}
+  .btn{min-height:46px;font-size:13px;padding:12px 14px}
+  .btn-row{flex-direction:column}
+  .btn-row .btn{flex:none}
+  .fare-preview{padding:10px}
+  .filter-row{gap:6px}
+  .filter-row select,.filter-row input[type=date]{min-width:0;flex:1;font-size:12px;padding:8px 8px;min-height:40px}
+  .txn-item{padding:10px 12px}
+  .txn-icon{width:30px;height:30px;font-size:13px}
+  .modal{padding:16px;border-radius:12px}
+  .modal-title{font-size:14px}
+  #qr-box canvas,.qr-box div{max-width:180px!important;max-height:180px!important}
+  .inline-row{flex-direction:column;align-items:center}
+  .cost-meter{margin-top:0}
+  .active-card{padding:14px}
+  #toast{font-size:12px;padding:8px 14px;bottom:70px;max-width:calc(100vw - 32px);white-space:normal;text-align:center}
+  .section-label{font-size:11px}
+  #book-plate{font-size:14px!important;letter-spacing:1px!important}
+  /* iOS safe area */
+  nav{padding-top:env(safe-area-inset-top)}
+  #toast{bottom:calc(64px + env(safe-area-inset-bottom));max-width:calc(100vw - 32px)}
+  .panel{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+  /* sticky bottom tab bar on mobile */
+  .tabs{position:fixed!important;bottom:0;top:auto!important;z-index:300;
+    border-top:1px solid var(--border);border-bottom:none;
+    padding-bottom:env(safe-area-inset-bottom);
+    background:var(--bg2)!important}
+  body{padding-bottom:calc(52px + env(safe-area-inset-bottom))}
+  /* Bigger touch targets */
+  .tab{padding:14px 16px;font-size:13px}
+  .btn-coin,.btn-primary,.btn-ghost,.btn-green,.btn-red{min-height:50px;font-size:14px}
+}
+.time-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.time-row .field{display:flex;flex-direction:column;gap:4px}
+.time-row .field label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+@media(max-width:480px){.time-row{grid-template-columns:1fr}}
+/* Fix datetime-local on all devices — ensure native picker works */
+input[type=datetime-local],input[type=date]{
+  -webkit-appearance:none;appearance:none;
+  color-scheme:dark;-webkit-color-scheme:dark;
+  cursor:pointer;
+}
+input[type=datetime-local]::-webkit-calendar-picker-indicator,
+input[type=date]::-webkit-calendar-picker-indicator{
+  filter:invert(1);opacity:.6;cursor:pointer;
+  padding:4px;margin-right:2px
+}
+/* Larger touch targets for quick-duration buttons */
+.quick-btn{min-height:44px!important;min-width:64px;padding:10px 14px!important;font-size:12px!important}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">IPRS <span>SmartCoin™</span></div>
+  <div id="nav-balance">… IPRS-C</div>
+  <div class="spacer"></div>
+  <div id="chain-badge" class="spin-badge">🔐 …</div>
+</nav>
+
+<!-- TABS -->
+<div class="tabs" id="tabs-bar">
+  <div class="tab active" data-tab="0">💰 Wallet</div>
+  <div class="tab" data-tab="1">📋 Book Slot</div>
+  <div class="tab" data-tab="2">🚗 Active</div>
+  <div class="tab" data-tab="3">📜 History</div>
+  <div class="tab" data-tab="4">🧾 Receipts</div>
+</div>
+
+<!-- ═══ PANEL 0: WALLET ══════════════════════════════════ -->
+<div class="panel active" id="panel-0">
+  <div class="balance-card">
+    <div class="balance-label">IPRS-Coin Balance</div>
+    <div><span class="balance-amount" id="bal-display">0</span>
+         <span class="balance-unit">IPRS-C</span></div>
+    <div class="balance-sub" id="bal-sub">Loading wallet…</div>
+    <div id="tier-badge-el" class="tier-badge tier-BRONZE">🥉 BRONZE</div>
+    <div class="tier-progress">
+      <div class="tier-prog-row">
+        <span id="tier-prog-label">0 / 10 sessions to SILVER</span>
+        <span id="tier-disc-label"></span>
+      </div>
+      <div class="tier-bar-bg"><div class="tier-bar-fill" id="tier-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-mini"><div class="lbl">Total Earned</div><div class="val green" id="st-earned">0</div></div>
+    <div class="stat-mini"><div class="lbl">Total Spent</div><div class="val amber" id="st-spent">0</div></div>
+    <div class="stat-mini"><div class="lbl">Sessions</div><div class="val purple" id="st-sessions">0</div></div>
+    <div class="stat-mini"><div class="lbl">Wallet ID</div>
+      <div class="val" id="st-wid" style="font-size:10px;color:var(--muted);margin-top:4px">–</div></div>
+  </div>
+
+  <div class="stack">
+    <button class="btn btn-coin" id="btn-topup">⚡ Add 50 IPRS-C (Demo Top-Up)</button>
+    <button class="btn btn-primary" id="btn-buy-iprs" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;font-weight:700;letter-spacing:.3px">
+      💳 Buy IPRS Coins — Scan &amp; Pay
+    </button>
+    <button class="btn btn-ghost" id="btn-verify">🔐 Verify Chain Integrity</button>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-export-json">📤 Export Ledger</button>
+      <button class="btn btn-ghost" id="btn-reset">🔄 Reset Demo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PANEL 1: BOOK SLOT ═══════════════════════════════ -->
+<div class="panel" id="panel-1">
+  <div class="section-label">Select Slot <span class="hint">(tap to select)</span></div>
+  <div class="slot-grid" id="slot-grid"></div>
+
+  <div class="section-label">Booking Window <span class="hint">(editable — fare updates live)</span></div>
+  <div class="time-row">
+    <div class="field">
+      <label>From</label>
+      <input type="datetime-local" id="book-from"
+        style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+               padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:.15s;box-sizing:border-box;min-height:44px"
+        onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+        onchange="onFromChange()" oninput="onFromChange()">
+    </div>
+    <div class="field">
+      <label>Until</label>
+      <input type="datetime-local" id="book-until"
+        style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+               padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:.15s;box-sizing:border-box;min-height:44px"
+        onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+        onchange="updateFarePreview()" oninput="updateFarePreview()">
+    </div>
+  </div>
+  <!-- Quick duration buttons -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+    <span style="font-size:10px;color:var(--muted);align-self:center;white-space:nowrap">Quick:</span>
+    <button type="button" class="btn btn-ghost" style="width:auto;padding:5px 12px;font-size:11px;border-radius:6px"
+      onclick="setDefaultTimes(30*60*1000)" class="quick-btn">30 min</button>
+    <button type="button" class="btn btn-ghost" style="width:auto;padding:5px 12px;font-size:11px;border-radius:6px"
+      onclick="setDefaultTimes(60*60*1000)" class="quick-btn">1 hr</button>
+    <button type="button" class="btn btn-ghost" style="width:auto;padding:5px 12px;font-size:11px;border-radius:6px"
+      onclick="setDefaultTimes(2*60*60*1000)" class="quick-btn">2 hr</button>
+    <button type="button" class="btn btn-ghost" style="width:auto;padding:5px 12px;font-size:11px;border-radius:6px"
+      onclick="setDefaultTimes(4*60*60*1000)" class="quick-btn">4 hr</button>
+    <button type="button" class="btn btn-ghost" style="width:auto;padding:5px 12px;font-size:11px;border-radius:6px;color:var(--muted)"
+      onclick="setDefaultTimes(8*60*60*1000)" class="quick-btn">8 hr</button>
+  </div>
+
+  <div class="section-label">Fare Preview</div>
+  <div class="fare-preview" id="fare-preview">
+    <div class="fare-row"><span class="lbl">Select a slot and booking window</span><span>–</span></div>
+  </div>
+
+  <div class="warn-strip" id="insuf-warn" style="display:none">
+    ⚠ Insufficient balance — add tokens before booking
+  </div>
+
+  <div class="section-label">Your Vehicle Plate <span class="hint">(Indian format — required)</span></div>
+  <div class="field" style="margin-bottom:14px">
+    <input type="text" id="book-plate"
+      placeholder="e.g. MH12AB1234"
+      maxlength="13" autocomplete="off" spellcheck="false"
+      inputmode="text" enterkeyhint="done"
+      style="width:100%;box-sizing:border-box;text-transform:uppercase;
+             letter-spacing:2.5px;font-family:monospace;font-size:17px;
+             font-weight:900;padding:13px 14px;min-height:52px;
+             background:var(--bg3);border:2px solid var(--border);
+             border-radius:10px;color:var(--text);outline:none;transition:.2s"
+      oninput="handlePlateInput(this)" onkeydown="blockInvalidPlateKey(event,this)"
+      onpaste="handlePlatePaste(event,this)">
+    <div id="plate-hint" style="font-size:11px;margin-top:6px;padding:7px 10px;border-radius:6px;display:none"></div>
+    <div style="margin-top:5px;font-size:10px;color:var(--muted)">
+      Format: <code style="color:var(--accent)">MH 12 AB 1234</code> (state · district · series · serial)
+      &nbsp;|&nbsp; BH-series: <code style="color:var(--accent)">22 BH 1234 AB</code>
+    </div>
+  </div>
+
+  <button class="btn btn-coin" id="btn-confirm-book" disabled>Confirm & Generate Token →</button>
+</div>
+
+<!-- ═══ PANEL 2: ACTIVE BOOKING ══════════════════════════ -->
+<div class="panel" id="panel-2">
+  <div class="no-booking-msg" id="no-active">
+    <div class="icon">🅿️</div>
+    <div style="font-weight:700;color:var(--text)">No Active Booking</div>
+    <div style="font-size:12px;margin-top:4px">Book a slot in the Book tab</div>
+    <button class="btn btn-primary" id="btn-go-book" style="margin-top:18px;width:auto;padding:10px 24px">Book Now →</button>
+  </div>
+  <div id="active-view" style="display:none">
+    <div class="active-card">
+      <div class="ab-header">
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px">Active Slot</div>
+          <div class="ab-slot-big" id="ab-slot">–</div>
+        </div>
+        <div class="status-pill status-active">ACTIVE</div>
+      </div>
+      <div class="info-row"><span class="k">Plate</span><span class="v" id="ab-plate">–</span></div>
+      <div class="info-row"><span class="k">From</span><span class="v" id="ab-from">–</span></div>
+      <div class="info-row"><span class="k">Until</span><span class="v" id="ab-until">–</span></div>
+      <div class="info-row"><span class="k">Token</span>
+        <span class="v" id="ab-token" style="font-size:10px;font-family:var(--mono);word-break:break-all">–</span></div>
+    </div>
+
+    <div class="inline-row" style="margin-bottom:6px">
+      <div class="countdown-wrap">
+        <div class="c-ring">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <circle class="c-track" cx="50" cy="50" r="45"/>
+            <circle class="c-fill" id="c-arc" cx="50" cy="50" r="45"/>
+          </svg>
+          <div class="c-text" id="c-text">–</div>
+        </div>
+        <div class="c-label">Time Remaining</div>
+      </div>
+      <div class="cost-meter" style="flex:1">
+        <div class="cm-lbl">Live Cost</div>
+        <div class="live-cost" id="live-cost">0</div>
+        <div class="cm-sub">IPRS-C accrued</div>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-ghost" id="btn-extend">⏱ Extend +1hr</button>
+      <button class="btn btn-green" id="btn-exit-pay">✓ Exit & Pay</button>
+    </div>
+    <button class="btn btn-red" id="btn-cancel" style="margin-top:8px">✕ Cancel Booking</button>
+  </div>
+</div>
+
+<!-- ═══ PANEL 3: HISTORY ══════════════════════════════════ -->
+<div class="panel" id="panel-3">
+  <div class="filter-row">
+    <select id="hist-action-filter">
+      <option value="">All Actions</option>
+      <option value="mint">💚 Mint</option>
+      <option value="deduct">🔴 Deduct</option>
+      <option value="refund">🔵 Refund</option>
+      <option value="book">🟣 Book</option>
+    </select>
+<input type="date" id="hist-date-filter" title="Tap to filter by date"
+      style="flex:1;min-width:120px;background:var(--bg3);border:2px solid var(--accent);
+             border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;
+             outline:none;cursor:pointer;min-height:44px;font-weight:600;
+             color-scheme:dark;-webkit-color-scheme:dark">
+    <button type="button" class="btn btn-ghost"
+      style="width:auto;padding:7px 14px;font-size:12px;border-radius:6px;white-space:nowrap;min-height:40px"
+      onclick="document.getElementById('hist-date-filter').value=new Date().toLocaleDateString('en-CA');setTimeout(renderHistory,80)">
+      📅 Today
+    </button>
+    <button type="button" class="btn btn-ghost"
+      style="width:auto;padding:6px 12px;font-size:11px;border-radius:6px"
+      onclick="document.getElementById('hist-date-filter').value='';document.getElementById('hist-action-filter').value='';renderHistory()">
+      ✕ Clear
+    </button>
+  </div>
+  <div id="hist-list"></div>
+  <div class="btn-row" style="margin-top:14px">
+    <button class="btn btn-ghost" id="btn-hist-json">📤 JSON</button>
+    <button class="btn btn-ghost" id="btn-hist-csv">📥 CSV</button>
+  </div>
+</div>
+
+<!-- ═══ PANEL 4: RECEIPTS ═════════════════════════════════ -->
+<div class="panel" id="panel-4">
+  <div id="receipts-list"></div>
+  <div id="no-receipts" style="text-align:center;padding:60px 20px;color:var(--muted)">
+    <div style="font-size:40px;margin-bottom:10px">🧾</div>
+    No receipts yet — complete a session
+  </div>
+</div>
+
+<!-- ═══ MODALS ════════════════════════════════════════════ -->
+
+<!-- QR Token Modal -->
+<div class="modal-bg" id="modal-qr">
+  <div class="modal">
+    <div class="modal-title">🎟️ Booking Token
+      <button class="modal-close" data-close="modal-qr">×</button></div>
+    <div id="qr-box"></div>
+    <div class="token-mono" id="qr-token-str"></div>
+    <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;margin-bottom:12px">
+      <div class="fare-row"><span class="lbl">Slot</span><b id="qr-slot">–</b></div>
+      <div class="fare-row"><span class="lbl">Duration</span><b id="qr-dur">–</b></div>
+      <div class="fare-row"><span class="lbl">Tokens Held</span><b style="color:var(--coin)" id="qr-tokens">–</b></div>
+    </div>
+    <div class="stack">
+      <button class="btn btn-ghost" id="btn-copy-token">📋 Copy Token</button>
+      <button class="btn btn-ghost" id="btn-share-token">📤 Share</button>
+      <button class="btn btn-primary" id="btn-goto-active">View Active Booking →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal-bg" id="modal-receipt">
+  <div class="modal">
+    <div class="modal-title">🧾 Receipt
+      <button class="modal-close" data-close="modal-receipt">×</button></div>
+    <div id="receipt-modal-body"></div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn btn-ghost" id="btn-print-receipt">🖨 Print</button>
+      <button class="btn btn-ghost" id="btn-png-receipt">⬇ PNG</button>
+    </div>
+  </div>
+</div>
+
+<!-- Buy IPRS Coins — Owner Payment QR Modal -->
+<div class="modal-bg" id="modal-buy-iprs">
+  <div class="modal">
+    <div class="modal-title">💳 Buy IPRS Coins
+      <button class="modal-close" data-close="modal-buy-iprs">×</button>
+    </div>
+    <!-- Coin amount selector -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--muted);align-self:center;white-space:nowrap">Amount:</span>
+      <button type="button" class="btn btn-ghost buy-amt-btn" data-amt="50"  style="width:auto;padding:6px 14px;font-size:12px;border-radius:6px">50 ₹</button>
+      <button type="button" class="btn btn-ghost buy-amt-btn" data-amt="100" style="width:auto;padding:6px 14px;font-size:12px;border-radius:6px">100 ₹</button>
+      <button type="button" class="btn btn-ghost buy-amt-btn" data-amt="200" style="width:auto;padding:6px 14px;font-size:12px;border-radius:6px">200 ₹</button>
+      <button type="button" class="btn btn-ghost buy-amt-btn" data-amt="500" style="width:auto;padding:6px 14px;font-size:12px;border-radius:6px">500 ₹</button>
+    </div>
+    <div style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center">
+      <div id="buy-qr-box" style="display:flex;justify-content:center;margin-bottom:10px"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Scan with any UPI app</div>
+      <div style="font-size:13px;font-weight:800;color:var(--coin)" id="buy-upi-display">iprs.parking@upi</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">IPRS Parking — Intelligent Parking System</div>
+    </div>
+    <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:8px;
+                padding:10px 14px;font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      ℹ️ After payment, show this QR to the parking attendant.<br>
+      <span style="color:var(--coin)">1 INR = 1 IPRS-Coin</span> &nbsp;|&nbsp; Coins credited within 2 minutes.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-copy-upi">📋 Copy UPI ID</button>
+      <button class="btn btn-ghost" id="btn-share-upi">📤 Share</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden print template -->
+<div id="receipt-print-tpl"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ══════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════
+const SERVER_IP   = location.hostname || "10.121.81.78";
+const SERVER_PORT = 5000;
+const STORE_KEY   = "iprs_customer_v10";
+const API         = `http://${SERVER_IP}:${SERVER_PORT}`;
+
+const SLOT_CONFIG = [
+  { id: "SL-A01", label: "A-01", type: "standard",    mul: 1.0, slotNum: 1 },
+  { id: "SL-A02", label: "A-02", type: "premium",     mul: 1.5, slotNum: 2 },
+  { id: "SL-A03", label: "A-03", type: "standard",    mul: 1.0, slotNum: 3 },
+  { id: "SL-B01", label: "B-01", type: "ev_charging", mul: 2.0, slotNum: 4 },
+];
+
+const RATES    = { peak: 3, standard: 2, offpeak: 1, weekend: 2 };
+const GRACE_MIN = 10;
+const WELCOME   = 50;
+
+const TIER_DEFS = [
+  { name: "BRONZE",   min:  0, disc: 0.00, icon: "🥉", next: 10  },
+  { name: "SILVER",   min: 10, disc: 0.10, icon: "🥈", next: 25  },
+  { name: "GOLD",     min: 25, disc: 0.20, icon: "🥇", next: 50  },
+  { name: "PLATINUM", min: 50, disc: 0.30, icon: "💎", next: 100 },
+  { name: "DIAMOND",  min:100, disc: 0.40, icon: "💠", next: null },
+];
+
+// ══════════════════════════════════════════════════════════════
+//  STATE MANAGEMENT (atomic read-modify-write)
+// ══════════════════════════════════════════════════════════════
+function initState() {
+  return {
+    wallet:  { id: `WLT-${Date.now()}`, balance: WELCOME, earned: WELCOME,
+               spent: 0, sessions: 0, createdAt: new Date().toISOString() },
+    ledger:  [],
+    receipts: [],
+    activeBooking: null,
+  };
+}
+function loadState()     { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || initState(); } catch { return initState(); } }
+function saveState(s)    { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
+function modifyState(fn) { const s = loadState(); fn(s); saveState(s); return s; }
+
+// ══════════════════════════════════════════════════════════════
+//  WEB CRYPTO SHA-256 HELPER
+// ══════════════════════════════════════════════════════════════
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LEDGER ENGINE — hash-chained append
+// ══════════════════════════════════════════════════════════════
+async function appendLedger(type, amount, balAfter, desc, meta = {}) {
+  const s    = loadState();
+  const prev = s.ledger.length ? s.ledger[s.ledger.length - 1].hash : "GENESIS";
+  const entry = {
+    id:          s.ledger.length + 1,
+    type,
+    amount:      Math.round(amount * 100) / 100,
+    balAfter:    Math.round(balAfter * 100) / 100,
+    desc,
+    ts:          new Date().toISOString(),
+    meta,
+    prevHash:    prev,
+    hash:        "",
+  };
+  const raw     = `${prev}|${type}|${amount}|${balAfter}|${entry.ts}`;
+  entry.hash    = await sha256(raw);
+  s.ledger.push(entry);
+  saveState(s);
+  return entry;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  WALLET OPERATIONS
+// ══════════════════════════════════════════════════════════════
+async function mintTokens(amount, reason) {
+  const s = modifyState(s => {
+    s.wallet.balance = +(s.wallet.balance + amount).toFixed(2);
+    s.wallet.earned  = +(s.wallet.earned  + amount).toFixed(2);
+  });
+  await appendLedger("mint", amount, s.wallet.balance, reason);
+  refreshWalletUI();
+  toast(`+${amount} IPRS-C — ${reason}`, "coin");
+}
+
+async function deductTokens(amount, slotId, durationMin) {
+  const s = loadState();
+  if (s.wallet.balance < amount) throw new Error("Insufficient balance");
+  const newBal = +(s.wallet.balance - amount).toFixed(2);
+  modifyState(s => {
+    s.wallet.balance  = newBal;
+    s.wallet.spent    = +(s.wallet.spent + amount).toFixed(2);
+    s.wallet.sessions = (s.wallet.sessions || 0) + 1;
+  });
+  await appendLedger("deduct", -amount, newBal, `Parking ${slotId}`, { slotId, durationMin });
+  refreshWalletUI();
+}
+
+async function refundTokens(amount, reason) {
+  const s = modifyState(s => {
+    s.wallet.balance = +(s.wallet.balance + amount).toFixed(2);
+    s.wallet.earned  = +(s.wallet.earned  + amount).toFixed(2);
+  });
+  await appendLedger("refund", amount, s.wallet.balance, reason);
+  refreshWalletUI();
+  if (amount > 0) toast(`+${amount} IPRS-C refunded`, "ok");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PRICING ENGINE
+// ══════════════════════════════════════════════════════════════
+function getRate(dtISO) {
+  const d = new Date(dtISO), h = d.getHours(), w = d.getDay();
+  if (w === 0 || w === 6) return { type: "weekend",  rate: RATES.weekend };
+  if ((h >= 8 && h < 10) || (h >= 17 && h < 20)) return { type: "peak",    rate: RATES.peak };
+  if (h >= 10 && h < 17) return { type: "standard", rate: RATES.standard };
+  return { type: "offpeak", rate: RATES.offpeak };
+}
+function getTierDef(sessions) {
+  let t = TIER_DEFS[0];
+  for (const d of TIER_DEFS) if (sessions >= d.min) t = d;
+  return t;
+}
+function calculateFare(fromISO, untilISO, slotType, sessions) {
+  const entry = new Date(fromISO), exit = new Date(untilISO);
+  const totalMin = Math.max(0, (exit - entry) / 60000);
+  if (totalMin <= GRACE_MIN) return {
+    total: 0, breakdown: [{ label: `Free (grace period ≤${GRACE_MIN}m)`, val: "0 IPRS-C" }],
+    durationMin: totalMin,
+  };
+  const billableMin = totalMin - GRACE_MIN;
+  const billableHrs = billableMin / 60;
+  const { type, rate } = getRate(fromISO);
+  const mulMap = { standard: 1.0, premium: 1.5, ev_charging: 2.0 };
+  const mul    = mulMap[slotType] || 1.0;
+  const tier   = getTierDef(sessions);
+  const base   = billableHrs * rate * mul;
+  const disc   = +(base * tier.disc).toFixed(2);
+  const total  = Math.max(1, Math.round(base - disc));
+  const breakdown = [
+    { label: `${type} rate ${rate} IPRS-C/hr × ${mul}×`, val: `${base.toFixed(2)}` },
+    disc > 0 && { label: `${tier.name} discount (${(tier.disc*100).toFixed(0)}%)`, val: `-${disc}`, cls: "discount" },
+    { label: "TOTAL CHARGED", val: `${total} IPRS-C`, bold: true },
+  ].filter(Boolean);
+  return { total, breakdown, durationMin: totalMin };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TOKEN & QR
+// ══════════════════════════════════════════════════════════════
+async function generateToken(slotId, userId, fromISO, untilISO) {
+  const ts   = Math.floor(new Date(fromISO).getTime() / 1000);
+  const raw  = `${slotId}|${userId}|${ts}|${untilISO}`;
+  const hash = (await sha256(raw)).slice(0, 8).toUpperCase();
+  const sid  = slotId.replace("SL-", "");
+  const uid  = userId.replace("WLT-", "").slice(0, 8);
+  return `IPRS-${sid}-${uid}-${ts}-${hash}`;
+}
+
+function renderQR(tokenStr) {
+  const box = document.getElementById("qr-box");
+  box.innerHTML = "";
+  try {
+    new QRCode(box, {
+      text: tokenStr, width: 200, height: 200,
+      colorDark: "#000000", colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch {
+    box.innerHTML = `<div style="width:200px;height:200px;background:#fff;border-radius:8px;
+      display:flex;align-items:center;justify-content:center;font-size:9px;color:#333;
+      font-family:monospace;text-align:center;padding:10px;word-break:break-all">${tokenStr}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CHAIN VERIFIER
+// ══════════════════════════════════════════════════════════════
+async function verifyChain() {
+  const s     = loadState();
+  const chain = s.ledger;
+  const badge = document.getElementById("chain-badge");
+  badge.className = "spin-badge"; badge.textContent = "🔐 Verifying…";
+  if (!chain.length) {
+    badge.className = "ok"; badge.textContent = "🔐 Chain Ready ✓";
+    toast("Ledger empty — chain is healthy and ready", "ok");
+    return { ok: true, checked: 0 };
+  }
+  let prev = "GENESIS";
+  for (let i = 0; i < chain.length; i++) {
+    const e   = chain[i];
+    const raw = `${prev}|${e.type}|${e.amount}|${e.balAfter}|${e.ts}`;
+    const exp = await sha256(raw);
+    if (exp !== e.hash) {
+      badge.className = "err"; badge.textContent = `🔴 Broken at #${e.id}`;
+      return { ok: false, brokenAt: e.id };
+    }
+    prev = e.hash;
+  }
+  badge.className = "ok"; badge.textContent = `🔐 Chain OK (${chain.length})`;
+  toast(`Chain verified — ${chain.length} entries`, "ok");
+  return { ok: true, checked: chain.length };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SLOT GRID RENDERING
+// ══════════════════════════════════════════════════════════════
+let selectedSlot  = null;
+let currentSlotStates = {};  // live from WS
+
+function renderSlotGrid() {
+  const grid = document.getElementById("slot-grid");
+  const mulLabels = { standard: "Standard", premium: "Premium", ev_charging: "EV" };
+  grid.innerHTML = SLOT_CONFIG.map(sl => {
+    const live = currentSlotStates[sl.id] || "free";
+    const isOcc = live === "occ" || live === "OCCUPIED" || live === "OCC";
+    const isRes = live === "reserved" || live === "RESERVED";
+    const cls = isOcc ? "occ" : isRes ? "reserved" : (selectedSlot === sl.id ? "selected" : "");
+    const stateLabel = isOcc ? `<span class="slot-state state-occ">OCCUPIED</span>`
+                     : isRes ? `<span class="slot-state state-res">RESERVED</span>`
+                     :         `<span class="slot-state state-free">FREE</span>`;
+    const mulBadge = sl.type === "premium" ? "mul-premium" : sl.type === "ev_charging" ? "mul-ev" : "mul-standard";
+    return `<div class="slot-card ${cls}" data-slot="${sl.id}">
+      <div class="slot-num">${sl.label.replace("A-","").replace("B-","")}</div>
+      <div class="slot-type-label">${sl.label}</div>
+      <span class="slot-mul-badge ${mulBadge}">${mulLabels[sl.type]} ×${sl.mul}</span>
+      ${stateLabel}
+    </div>`;
+  }).join("");
+  // Attach click listeners
+  grid.querySelectorAll(".slot-card:not(.occ):not(.reserved)").forEach(el => {
+    el.addEventListener("click", () => {
+      selectedSlot = el.dataset.slot;
+      renderSlotGrid();
+      updateFarePreview();
+      // Mobile: scroll fare preview into view after slot selection
+      const fp = document.getElementById("fare-preview");
+      if (fp) fp.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FARE PREVIEW
+// ══════════════════════════════════════════════════════════════
+function updateFarePreview() {
+  const fromVal  = document.getElementById("book-from").value;
+  const untilVal = document.getElementById("book-until").value;
+  const fp       = document.getElementById("fare-preview");
+  const btn      = document.getElementById("btn-confirm-book");
+  const insuf    = document.getElementById("insuf-warn");
+
+  if (!selectedSlot || !fromVal || !untilVal) {
+    fp.innerHTML = `<div class="fare-row"><span class="lbl">Select a slot and booking window</span><span>–</span></div>`;
+    btn.disabled = true; insuf.style.display = "none";
+    return;
+  }
+  if (new Date(untilVal) <= new Date(fromVal)) {
+    fp.innerHTML = `<div class="fare-row" style="color:var(--red)"><span class="lbl">⚠ "Until" must be after "From"</span><span>–</span></div>`;
+    btn.disabled = true; insuf.style.display = "none";
+    return;
+  }
+  if (new Date(fromVal) < new Date(Date.now() - 60000)) {
+    fp.innerHTML = `<div class="fare-row" style="color:var(--red)"><span class="lbl">⚠ Start time is in the past — use quick buttons or pick a future time</span><span>–</span></div>`;
+    btn.disabled = true; insuf.style.display = "none";
+    return;
+  }
+  const slot = SLOT_CONFIG.find(s => s.id === selectedSlot);
+  const s    = loadState();
+  const fare = calculateFare(fromVal, untilVal, slot.type, s.wallet.sessions);
+  fp.innerHTML = fare.breakdown.map(b => `
+    <div class="fare-row ${b.cls || ""}" style="${b.bold ? "font-weight:700;color:var(--coin)" : ""}">
+      <span class="lbl">${b.label}</span><span>${b.val}</span></div>`).join("");
+  const canAfford  = s.wallet.balance >= fare.total;
+  const plateOk    = validateIndianPlate(
+    (document.getElementById("book-plate")?.value || "").toUpperCase().replace(/[^A-Z0-9]/g,"")
+  ).ok;
+  insuf.style.display = canAfford ? "none" : "";
+  btn.disabled = !canAfford || !plateOk || fare.total === undefined;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PLATE VALIDATION — Indian number plate formats
+// ══════════════════════════════════════════════════════════════
+// Standard: KA01AB1234  (state 2L + district 1-2D + series 1-3L + serial 4D)
+const RE_STANDARD = /^([A-Z]{2})(\d{1,2})([A-Z]{1,3})(\d{4})$/;
+// BH Series: 22BH1234AB (year 2D + BH + serial 4D + code 2L)
+const RE_BH       = /^(\d{2})(BH)(\d{4})([A-Z]{2})$/;
+
+const VALID_STATE_CODES = new Set([
+  "AN","AP","AR","AS","BR","CG","CH","DD","DL","DN","GA","GJ","HP",
+  "HR","JH","JK","KA","KL","LA","LD","MH","ML","MN","MP","MZ","NL",
+  "OD","PB","PY","RJ","SK","TN","TR","TS","UK","UP","UT","WB"
+]);
+
+function validateIndianPlate(raw) {
+  const p = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!p) return { ok: false, msg: "Enter your vehicle plate number" };
+  if (p.length < 6)  return { ok: false, msg: `Too short — need at least 6 characters (got ${p.length})` };
+  if (p.length > 13) return { ok: false, msg: "Too long — max 13 characters" };
+  // Guard: all-digit input (e.g. 12345677) is never valid — BH series needs "BH" letters
+  if (/^\d+$/.test(p)) return { ok: false, msg: "❌ Numbers only — invalid. BH-series format: 22BH1234AB" };
+  // BH series check
+  if (RE_BH.test(p)) return { ok: true, msg: `✓ Valid BH-series plate: ${p}` };
+  // Standard series
+  const m = RE_STANDARD.exec(p);
+  if (!m)  return { ok: false, msg: `Invalid format — expected e.g. MH12AB1234 or TS09EF5678` };
+  if (!VALID_STATE_CODES.has(m[1]))
+    return { ok: false, msg: `Unknown state code "${m[1]}" — check first two letters` };
+  return { ok: true, msg: `✓ Valid plate: ${m[1]} ${m[2]} ${m[3]} ${m[4]}` };
+}
+
+// Block obviously-invalid key strokes at the keyboard level on mobile
+function blockInvalidPlateKey(ev, el) {
+  // Allow: backspace, delete, arrows, tab, enter, ctrl/cmd shortcuts
+  if (ev.key.length > 1 || ev.ctrlKey || ev.metaKey) return;
+  const cur   = el.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const nextP = cur.length;   // position being typed
+  const ch    = ev.key.toUpperCase();
+  const isAlpha = /[A-Z]/.test(ch);
+  const isDigit = /[0-9]/.test(ch);
+  // Reject non-alphanumeric entirely
+  if (!isAlpha && !isDigit) { ev.preventDefault(); return; }
+  const isBHSeries = cur.length >= 2 && /^\d{2}/.test(cur);
+  if (!isBHSeries) {
+    // Standard plate: pos 0 allows either (digit → BH series; letter → standard)
+    // Only enforce letter at pos 1 if pos 0 was already a letter
+    if (nextP === 1 && /[A-Z]/.test(cur[0]) && !isAlpha) { ev.preventDefault(); return; }
+    if (nextP === 0) { /* allow both digit/letter — decide series after 2 chars */ }
+    // pos 2-3 MUST be digits (district)
+    if (nextP >= 2 && nextP < 4 && !isDigit) { ev.preventDefault(); return; }
+    // pos 4-6 MUST be letters (series)
+    if (nextP >= 4 && nextP < 7 && !isAlpha) { ev.preventDefault(); return; }
+    // pos 7-10 MUST be digits (serial)
+    if (nextP >= 7 && !isDigit) { ev.preventDefault(); return; }
+  } else {
+    // BH-series: pos 0-1 digits ✓ | pos 2-3 "BH" letters | pos 4-7 digits | pos 8-9 letters
+    if (nextP >= 2 && nextP < 4 && !isAlpha) { ev.preventDefault(); return; }
+    if (nextP >= 4 && nextP < 8 && !isDigit) { ev.preventDefault(); return; }
+    if (nextP >= 8 && !isAlpha)  { ev.preventDefault(); return; }
+  }
+}
+
+function handlePlateInput(el) {
+  // Step 1 — strip all non-alphanumeric, force uppercase
+  let v = el.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // Immediately reject pure-digit strings ≥5 chars (e.g. 12345677)
+  // BH-series MUST contain "BH" letters — purely numeric is never valid
+  if (v.length >= 5 && /^\d+$/.test(v)) {
+    const hint = document.getElementById("plate-hint");
+    el.style.borderColor = "var(--red)";
+    hint.style.display = "";
+    hint.style.background = "rgba(239,68,68,.08)";
+    hint.style.color = "var(--red)";
+    hint.style.border = "1px solid rgba(239,68,68,.25)";
+    hint.textContent = "❌ Numbers only — not valid. BH-series: 22BH1234AB | Standard: MH12AB1234";
+    el.value = v;
+    updateFarePreview();
+    return;
+  }
+
+  // Step 2 — smart per-position character-class enforcement
+  // Standard plate: 2 letters | 1-2 digits | 1-3 letters | 4 digits
+  // BH-series:      2 digits  | "BH"       | 4 digits    | 2 letters
+  // Decision at pos 0-1: if first 2 chars are both digits, assume BH-series.
+  // Otherwise force letters at pos 0-1 (standard state code).
+  const isBH = v.length >= 2 && /^\d{2}/.test(v);
+  if (!isBH && v.length >= 1) {
+    // pos 0,1 must be letters for standard plates
+    let out = "";
+    for (let i = 0; i < v.length; i++) {
+      if (i < 2) {
+        if (/[A-Z]/.test(v[i])) out += v[i];
+        // silently drop digit if typed at pos 0-1 for standard plates
+      } else {
+        out += v[i];
+      }
+    }
+    v = out;
+  }
+  el.value = v;
+
+  const hint = document.getElementById("plate-hint");
+  if (!v) {
+    el.style.borderColor = "var(--border)";
+    hint.style.display = "none";
+    updateFarePreview();
+    return;
+  }
+  const { ok, msg } = validateIndianPlate(v);
+  const isLong = v.length >= 6;
+  el.style.borderColor   = ok ? "var(--green)" : isLong ? "var(--red)" : "var(--coin)";
+  hint.style.display     = "";
+  hint.style.background  = ok ? "rgba(16,185,129,.08)" : isLong ? "rgba(239,68,68,.08)" : "rgba(245,158,11,.08)";
+  hint.style.color       = ok ? "var(--green)"         : isLong ? "var(--red)"          : "var(--coin)";
+  hint.style.border      = ok ? "1px solid rgba(16,185,129,.25)" : isLong ? "1px solid rgba(239,68,68,.25)" : "1px solid rgba(245,158,11,.25)";
+  hint.textContent = msg;
+  updateFarePreview();
+}
+
+// ── Paste handler for plate input — blocks invalid paste on mobile ──────
+function handlePlatePaste(ev, el) {
+  ev.preventDefault();
+  const raw = (ev.clipboardData || window.clipboardData).getData("text");
+  const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 13);
+  el.value = clean;
+  handlePlateInput(el);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BOOKING FLOW
+// ══════════════════════════════════════════════════════════════
+let pendingBooking = null;
+
+function vibrate(pattern=[40]) {
+  try { navigator.vibrate && navigator.vibrate(pattern); } catch {}
+}
+
+async function confirmBooking() {
+  const fromVal  = document.getElementById("book-from").value;
+  const untilVal = document.getElementById("book-until").value;
+  if (!selectedSlot) { toast("Select a slot first", "err"); return; }
+  if (!fromVal || !untilVal) { toast("Set booking window", "err"); return; }
+
+  // ── Plate validation — full Indian plate regex ─────────────────────────
+  const plateInput = document.getElementById("book-plate");
+  const plateVal   = (plateInput.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const { ok: plateOk, msg: plateMsg } = validateIndianPlate(plateVal);
+  if (!plateOk) {
+    handlePlateInput(plateInput);   // show inline error
+    toast(plateMsg, "err");
+    plateInput.focus();
+    return;
+  }
+  // ── end plate validation ──────────────────────────────────────────────
+
+  const fromISO  = new Date(fromVal).toISOString();
+  const untilISO = new Date(untilVal).toISOString();
+  if (new Date(untilISO) <= new Date(fromISO)) { toast("Until must be after From", "err"); return; }
+  const slot = SLOT_CONFIG.find(s => s.id === selectedSlot);
+  const s    = loadState();
+  const fare = calculateFare(fromISO, untilISO, slot.type, s.wallet.sessions);
+  if (s.wallet.balance < fare.total) { toast("Insufficient IPRS-C", "err"); return; }
+
+  const token = await generateToken(selectedSlot, s.wallet.id, fromISO, untilISO);
+
+  // Record booking in state without deducting (deduct on exit for accuracy)
+  const booking = {
+    token, slotId: selectedSlot, slotLabel: slot.label, slotType: slot.type,
+    fromISO, untilISO, tokensHeld: fare.total,
+    status: "ACTIVE", plate: plateVal,
+    createdAt: new Date().toISOString(),
+  };
+  modifyState(s => { s.activeBooking = booking; });
+  await appendLedger("book", -fare.total, +(s.wallet.balance - fare.total).toFixed(2), `Booking ${slot.label}`,
+    { slotId: selectedSlot, fromISO, untilISO });
+
+  // Notify server — sends slotNum (int 1-4) so server can correctly update slot_state
+  fetch(`${API}/booking`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token,
+      slotNum:  slot.slotNum,          // FIX: send INTEGER 1-4, not "01" string
+      lane:     "ENTRY",
+      plate:    plateVal,
+      from:     fromISO,
+      until:    untilISO,
+    }),
+  }).then(r => r.json()).then(d => {
+    if (d.recId) modifyState(st => {
+      if (st.activeBooking) st.activeBooking.serverRecId = d.recId;
+    });
+  }).catch(() => {});
+
+  pendingBooking = booking;
+  document.getElementById("qr-token-str").textContent = token;
+  document.getElementById("qr-slot").textContent      = slot.label;
+  document.getElementById("qr-dur").textContent       = fmtDuration(new Date(fromISO), new Date(untilISO));
+  document.getElementById("qr-tokens").textContent    = `${fare.total} IPRS-C`;
+  renderQR(token);
+  openModal("modal-qr");
+  refreshWalletUI();
+  vibrate([30, 50, 80]);
+  toast("Booking confirmed!", "ok");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ACTIVE BOOKING — live countdown + cost meter
+// ══════════════════════════════════════════════════════════════
+let _activeInterval = null;
+
+function refreshActivePanel() {
+  const s = loadState();
+  if (!s.activeBooking) {
+    document.getElementById("no-active").style.display   = "";
+    document.getElementById("active-view").style.display = "none";
+    clearInterval(_activeInterval);
+    return;
+  }
+  const b = s.activeBooking;
+  document.getElementById("no-active").style.display   = "none";
+  document.getElementById("active-view").style.display = "";
+  document.getElementById("ab-slot").textContent        = b.slotLabel || b.slotId;
+  document.getElementById("ab-plate").textContent       = b.plate || "–";
+  document.getElementById("ab-from").textContent        = new Date(b.fromISO).toLocaleString("en-IN");
+  document.getElementById("ab-until").textContent       = new Date(b.untilISO).toLocaleString("en-IN");
+  document.getElementById("ab-token").textContent       = b.token;
+
+  clearInterval(_activeInterval);
+  _activeInterval = setInterval(() => tickActive(b), 1000);
+  tickActive(b);
+}
+
+function tickActive(b) {
+  const now    = Date.now();
+  const until  = new Date(b.untilISO).getTime();
+  const from   = new Date(b.fromISO).getTime();
+  const total  = until - from;
+  const remain = Math.max(0, until - now);
+  const pct    = total > 0 ? Math.max(0, remain / total) : 0;
+  const mins   = Math.floor(remain / 60000);
+  const secs   = Math.floor((remain % 60000) / 1000);
+
+  // SVG ring — dasharray 283 = 2π×45
+  const dash = Math.round(pct * 283);
+  document.getElementById("c-arc").style.strokeDasharray  = `${dash} 283`;
+  document.getElementById("c-text").textContent = remain > 0
+    ? (mins >= 60 ? `${Math.floor(mins/60)}h` : `${mins}:${String(secs).padStart(2,"0")}`)
+    : "00:00";
+
+  // Live cost meter — accrued since entry
+  const elapsed = (now - from) / 60000;
+  const slot    = SLOT_CONFIG.find(s => s.id === b.slotId);
+  const fare    = calculateFare(b.fromISO, new Date().toISOString(), (slot||{}).type||"standard",
+    loadState().wallet.sessions);
+  document.getElementById("live-cost").textContent = fare.total;
+}
+
+async function exitAndPay() {
+  const s = loadState();
+  if (!s.activeBooking) { toast("No active booking", "err"); return; }
+  const b      = s.activeBooking;
+  const exitISO = new Date().toISOString();
+  const slot   = SLOT_CONFIG.find(sl => sl.id === b.slotId);
+  const fare   = calculateFare(b.fromISO, exitISO, (slot||{}).type||"standard", s.wallet.sessions);
+  try {
+    await deductTokens(fare.total, b.slotId, Math.round(fare.durationMin));
+  } catch (e) { toast(e.message, "err"); return; }
+  const receipt = {
+    id:          `RCPT-${Date.now()}`,
+    slotLabel:   b.slotLabel,
+    slotType:    b.slotType,
+    entry:       b.fromISO,
+    exit:        exitISO,
+    duration:    fmtDuration(new Date(b.fromISO), new Date(exitISO)),
+    fare,
+    createdAt:   new Date().toISOString(),
+  };
+  // FIX: Notify server to mark slot EMPTY and record exited
+  const activeToken = b.token;
+  modifyState(s => { s.receipts = [receipt, ...(s.receipts||[])]; s.activeBooking = null; });
+  clearInterval(_activeInterval);
+  refreshActivePanel(); renderReceipts();
+  vibrate([50, 30, 50, 30, 100]);
+  toast(`Paid ${fare.total} IPRS-C — Receipt saved`, "ok");
+
+  fetch(`${API}/booking/exit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: activeToken, paymentAmt: fare.total }),
+  }).catch(() => {});
+}
+
+async function extendBooking() {
+  const s = loadState();
+  if (!s.activeBooking) return;
+  const newUntil = new Date(new Date(s.activeBooking.untilISO).getTime() + 3600000).toISOString();
+  const slot     = SLOT_CONFIG.find(sl => sl.id === s.activeBooking.slotId);
+  const extFare  = calculateFare(s.activeBooking.untilISO, newUntil, (slot||{}).type||"standard", s.wallet.sessions);
+  if (s.wallet.balance < extFare.total) { toast("Insufficient balance to extend", "err"); return; }
+  await deductTokens(extFare.total, s.activeBooking.slotId, 60);
+  modifyState(s => { if (s.activeBooking) s.activeBooking.untilISO = newUntil; });
+  clearInterval(_activeInterval);
+  refreshActivePanel();
+  toast(`Extended +1hr — ${extFare.total} IPRS-C deducted`, "ok");
+}
+
+async function cancelBooking() {
+  const s = loadState();
+  if (!s.activeBooking) return;
+  const held        = s.activeBooking.tokensHeld || 0;
+  const cancelToken = s.activeBooking.token;
+  modifyState(st => { st.activeBooking = null; });
+  if (held > 0) await refundTokens(held, "Booking cancelled");
+  clearInterval(_activeInterval);
+  refreshActivePanel();
+  toast(`Booking cancelled — ${held} IPRS-C refunded`, "ok");
+
+  // FIX: notify server to free the slot
+  fetch(`${API}/booking/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: cancelToken }),
+  }).catch(() => {});
+}
+
+// ══════════════════════════════════════════════════════════════
+//  WALLET UI
+// ══════════════════════════════════════════════════════════════
+function refreshWalletUI() {
+  const s    = loadState();
+  const w    = s.wallet;
+  const tier = getTierDef(w.sessions || 0);
+
+  const balEl = document.getElementById("bal-display");
+  if (balEl.textContent !== String(w.balance)) {
+    balEl.style.transform = "scale(1.12)"; balEl.style.transition = "transform .2s";
+    setTimeout(() => { balEl.style.transform = ""; }, 200);
+  }
+  balEl.textContent = w.balance;
+  document.getElementById("nav-balance").textContent   = `${w.balance} IPRS-C`;
+  document.getElementById("bal-sub").textContent       = `Wallet: ${w.id.slice(0,12)}…`;
+  document.getElementById("st-earned").textContent     = w.earned;
+  document.getElementById("st-spent").textContent      = w.spent;
+  document.getElementById("st-sessions").textContent   = w.sessions || 0;
+  document.getElementById("st-wid").textContent        = w.id.slice(0,14);
+
+  const badgeEl = document.getElementById("tier-badge-el");
+  badgeEl.className = `tier-badge tier-${tier.name}`;
+  badgeEl.textContent = `${tier.icon} ${tier.name}`;
+
+  const sessions   = w.sessions || 0;
+  const progress   = tier.next
+    ? Math.min(100, Math.round(((sessions - tier.min) / (tier.next - tier.min)) * 100))
+    : 100;
+  document.getElementById("tier-bar").style.width = progress + "%";
+  document.getElementById("tier-prog-label").textContent =
+    tier.next ? `${sessions} / ${tier.next} sessions to next tier` : `Max tier reached`;
+  document.getElementById("tier-disc-label").textContent =
+    tier.disc > 0 ? `${(tier.disc*100).toFixed(0)}% off` : "";
+
+  renderHistory();
+  renderReceipts();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HISTORY RENDER
+// ══════════════════════════════════════════════════════════════
+function renderHistory() {
+  const s       = loadState();
+  const ledger  = s.ledger || [];
+  const action  = document.getElementById("hist-action-filter").value.toLowerCase();
+  const dateVal = document.getElementById("hist-date-filter").value;
+  const list    = document.getElementById("hist-list");
+
+  const filtered = ledger.filter(e => {
+    const matchA = !action || e.type.toLowerCase() === action;
+    // FIX: compare using LOCAL date string (not UTC ISO) to respect IST timezone
+    const localDate = e.ts ? new Date(e.ts).toLocaleDateString("en-CA") : ""; // "YYYY-MM-DD" in local TZ
+    const matchD = !dateVal || localDate === dateVal;
+    return matchA && matchD;
+  }).slice().reverse();
+
+  if (!filtered.length) {
+    const emptyMsg = (action || dateVal)
+      ? `<div style="text-align:center;padding:40px 20px;color:var(--muted)">
+           <div style="font-size:32px;margin-bottom:8px">🔍</div>
+           No transactions match the filter<br>
+           <button type="button" onclick="document.getElementById('hist-date-filter').value='';document.getElementById('hist-action-filter').value='';renderHistory()"
+             style="margin-top:12px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);color:var(--accent);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px">
+             Clear filters
+           </button>
+         </div>`
+      : `<div style="text-align:center;padding:40px 20px;color:var(--muted)">
+           <div style="font-size:36px;margin-bottom:8px">💸</div>
+           No transactions yet<br><span style="font-size:12px">Book and park to see history</span>
+         </div>`;
+    list.innerHTML = emptyMsg;
+    return;
+  }
+  const ICONS = { mint:"💚", deduct:"🔴", refund:"🔵", book:"🟣" };
+  list.innerHTML = filtered.map((e, i) => {
+    const pos    = e.amount > 0;
+    const icon   = ICONS[e.type] || "⬜";
+    return `<div class="txn-item" data-idx="${i}">
+      <div class="txn-header">
+        <div class="txn-icon ${e.type}">${icon}</div>
+        <div class="txn-info">
+          <div class="txn-action">${e.type.toUpperCase()} — ${e.desc||""}</div>
+          <div class="txn-time">${new Date(e.ts).toLocaleString("en-IN")}</div>
+        </div>
+        <div class="txn-amount ${pos?"pos":"neg"}">${pos?"+":""}${e.amount}</div>
+      </div>
+      <div class="txn-detail" id="txn-det-${i}">
+        <div class="txn-detail-row"><span class="k">Balance after</span><span>${e.balAfter} IPRS-C</span></div>
+        <div class="txn-detail-row"><span class="k">Entry #</span><span>${e.id}</span></div>
+        <div class="hash-mono">Hash: ${e.hash ? e.hash.slice(0,32)+"…" : "–"}</div>
+      </div>
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".txn-item").forEach((el, i) => {
+    el.addEventListener("click", () => {
+      const det = document.getElementById(`txn-det-${i}`);
+      det.classList.toggle("open");
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RECEIPTS RENDER
+// ══════════════════════════════════════════════════════════════
+function renderReceipts() {
+  const s        = loadState();
+  const receipts = s.receipts || [];
+  const list     = document.getElementById("receipts-list");
+  const none     = document.getElementById("no-receipts");
+
+  if (!receipts.length) { list.innerHTML = ""; none.style.display = ""; return; }
+  none.style.display = "none";
+
+  list.innerHTML = receipts.map((r, i) => `
+    <div class="receipt-item" data-ridx="${i}">
+      <div class="rcpt-header">
+        <div>
+          <div class="rcpt-id">${r.id}</div>
+          <div class="rcpt-meta">
+            <span>🅿 ${r.slotLabel}</span>
+            <span>⏱ ${r.duration}</span>
+          </div>
+        </div>
+        <div class="rcpt-amount">${r.fare.total} IPRS-C</div>
+      </div>
+      <div style="margin-top:8px" class="btn-row">
+        <button class="btn btn-ghost" style="padding:7px;font-size:11px" data-view="${i}">👁 View</button>
+        <button class="btn btn-ghost" style="padding:7px;font-size:11px" data-print="${i}">🖨 Print</button>
+      </div>
+    </div>`).join("");
+
+  list.querySelectorAll("[data-view]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      showReceiptModal(receipts[+btn.dataset.view]);
+    });
+  });
+  list.querySelectorAll("[data-print]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      buildPrintReceipt(receipts[+btn.dataset.print]);
+      window.print();
+    });
+  });
+}
+
+function showReceiptModal(r) {
+  const lines = r.fare.breakdown.map(b =>
+    `<div class="fare-row ${b.cls||""}" style="${b.bold?"font-weight:700;color:var(--coin)":""}">
+      <span class="lbl">${b.label}</span><span>${b.val}</span></div>`
+  ).join("");
+  document.getElementById("receipt-modal-body").innerHTML = `
+    <div style="background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:16px;font-size:12px" id="rcpt-content">
+      <div style="text-align:center;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:800;color:var(--white)">IPRS SmartCoin™</div>
+        <div style="color:var(--muted);font-size:10px">Intelligent Parking Receipt</div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:8px 0"></div>
+      <div class="fare-row"><span class="lbl">Receipt</span><span style="font-size:10px;font-family:var(--mono)">${r.id}</span></div>
+      <div class="fare-row"><span class="lbl">Slot</span><span>${r.slotLabel} (${r.slotType})</span></div>
+      <div class="fare-row"><span class="lbl">Entry</span><span>${new Date(r.entry).toLocaleString("en-IN")}</span></div>
+      <div class="fare-row"><span class="lbl">Exit</span><span>${new Date(r.exit).toLocaleString("en-IN")}</span></div>
+      <div class="fare-row"><span class="lbl">Duration</span><span>${r.duration}</span></div>
+      <div style="border-top:1px solid var(--border);margin:8px 0"></div>
+      ${lines}
+    </div>`;
+  openModal("modal-receipt");
+}
+
+function buildPrintReceipt(r) {
+  document.getElementById("receipt-print-tpl").innerHTML = `
+    <div class="rp-border">
+      <div class="rp-title">IPRS SmartCoin™ Receipt</div>
+      <div class="rp-div"></div>
+      <div class="rp-row"><span>ID</span><span>${r.id}</span></div>
+      <div class="rp-row"><span>Slot</span><span>${r.slotLabel}</span></div>
+      <div class="rp-row"><span>Entry</span><span>${new Date(r.entry).toLocaleString()}</span></div>
+      <div class="rp-row"><span>Exit</span><span>${new Date(r.exit).toLocaleString()}</span></div>
+      <div class="rp-row"><span>Duration</span><span>${r.duration}</span></div>
+      <div class="rp-div"></div>
+      <div class="rp-row rp-total"><span>TOTAL</span><span>${r.fare.total} IPRS-C</span></div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EXPORTS
+// ══════════════════════════════════════════════════════════════
+function exportJSON() {
+  const s    = loadState();
+  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), ...s }, null, 2)],
+    { type: "application/json" });
+  const a = document.createElement("a");
+  a.download = `IPRS-Ledger-${Date.now()}.json`; a.href = URL.createObjectURL(blob); a.click();
+  toast("Ledger exported", "ok");
+}
+
+function exportCSV() {
+  const { ledger } = loadState();
+  if (!ledger.length) { toast("No data to export", "err"); return; }
+  const hdr  = "ID,Type,Amount,Balance,Description,Timestamp\n";
+  const rows = ledger.map(e =>
+    `${e.id},${e.type},${e.amount},${e.balAfter},"${e.desc}","${e.ts}"`
+  ).join("\n");
+  const blob = new Blob([hdr + rows], { type: "text/csv" });
+  const a    = document.createElement("a");
+  a.download = `IPRS-Ledger-${Date.now()}.csv`; a.href = URL.createObjectURL(blob); a.click();
+  toast("CSV exported", "ok");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BUY IPRS COINS — Owner UPI Payment QR
+// ══════════════════════════════════════════════════════════════
+const OWNER_UPI    = "iprs.parking@upi";
+const OWNER_NAME   = "IPRS Parking";
+let   _buyQRAmount = 100;  // default selected amount
+let   _buyQRInst   = null; // QRCode instance
+
+function buildUpiUrl(amount) {
+  return `upi://pay?pa=${encodeURIComponent(OWNER_UPI)}&pn=${encodeURIComponent(OWNER_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent("IPRS Coins Purchase")}`;
+}
+
+function renderBuyQR(amount) {
+  _buyQRAmount = amount;
+  const box = document.getElementById("buy-qr-box");
+  box.innerHTML = "";
+  const upiUrl = buildUpiUrl(amount);
+  try {
+    _buyQRInst = new QRCode(box, {
+      text: upiUrl, width: 200, height: 200,
+      colorDark: "#000000", colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch {
+    // Fallback: show UPI string as text QR placeholder
+    box.innerHTML = `<div style="width:200px;height:200px;background:#fff;border-radius:8px;
+      display:flex;align-items:center;justify-content:center;flex-direction:column;
+      font-size:9px;color:#333;font-family:monospace;text-align:center;padding:10px;word-break:break-all">
+      <div style="font-size:11px;font-weight:700;margin-bottom:6px">UPI Payment</div>
+      ${upiUrl}</div>`;
+  }
+  // Highlight selected amount button
+  document.querySelectorAll(".buy-amt-btn").forEach(b => {
+    const selected = +b.dataset.amt === amount;
+    b.style.background     = selected ? "rgba(124,58,237,.25)" : "";
+    b.style.borderColor    = selected ? "#7c3aed" : "";
+    b.style.color          = selected ? "#a78bfa" : "";
+  });
+}
+
+function openBuyModal() {
+  openModal("modal-buy-iprs");
+  // Slight delay so modal is visible before QR renders
+  setTimeout(() => renderBuyQR(_buyQRAmount), 60);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LIVE SLOT UPDATES — WebSocket from server
+// ══════════════════════════════════════════════════════════════
+function connectWS() {
+  try {
+    const ws = new WebSocket(`ws://${SERVER_IP}:${SERVER_PORT}/ws/dashboard`);
+    ws.onmessage = e => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === "SLOT_UPDATE" && d.lane === "ENTRY" && Array.isArray(d.slotStatus)) {
+          d.slotStatus.forEach((st, i) => {
+            if (SLOT_CONFIG[i]) currentSlotStates[SLOT_CONFIG[i].id] = st;
+          });
+          renderSlotGrid();
+        }
+        // FIX: server sends type="SNAPSHOT"; slots.ENTRY is a flat array
+        if (d.type === "SNAPSHOT" && d.slots?.ENTRY) {
+          const arr = Array.isArray(d.slots.ENTRY)
+            ? d.slots.ENTRY                          // flat ["EMPTY","OCCUPIED",…]
+            : (Array.isArray(d.slots.ENTRY?.slotStatus) ? d.slots.ENTRY.slotStatus : []);
+          arr.forEach((st, i) => {
+            if (SLOT_CONFIG[i]) currentSlotStates[SLOT_CONFIG[i].id] = st;
+          });
+          renderSlotGrid();
+        }
+      } catch {}
+    };
+    ws.onclose = () => setTimeout(connectWS, 5000);
+  } catch {}
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MODAL / TAB HELPERS
+// ══════════════════════════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add("open");
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove("open");
+}
+
+let _toastTimer = null;
+function toast(msg, type = "info") {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.className = "show " + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ""; }, 2800);
+}
+
+function fmtDuration(from, to) {
+  const min = Math.round((to - from) / 60000);
+  return min >= 60 ? `${Math.floor(min/60)}h ${min%60}m` : `${min}m`;
+}
+
+function switchTab(idx) {
+  document.querySelectorAll(".panel").forEach((p, i) => p.classList.toggle("active", i === idx));
+  document.querySelectorAll(".tab").forEach((t, i)   => t.classList.toggle("active",  i === idx));
+  if (idx === 2) refreshActivePanel();
+  if (idx === 3) renderHistory();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DEFAULT BOOKING TIMES (1h from now)
+// ══════════════════════════════════════════════════════════════
+function localDatetimeStr(d) {
+  // Produces YYYY-MM-DDTHH:MM in LOCAL time (not UTC) — required for datetime-local inputs
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function setDefaultTimes(durMs = 3600000) {
+  const from  = new Date(); from.setSeconds(0, 0);
+  const until = new Date(from.getTime() + durMs);
+  const nowStr  = localDatetimeStr(new Date());
+  const fromEl  = document.getElementById("book-from");
+  const untilEl = document.getElementById("book-until");
+  // Note: no `min` attr — allow free time picking; past-time validated at confirm
+  fromEl.value  = localDatetimeStr(from);
+  untilEl.value = localDatetimeStr(until);
+  updateFarePreview();
+}
+
+// Called when user manually changes the "From" datetime
+function onFromChange() {
+  const fromEl  = document.getElementById("book-from");
+  const untilEl = document.getElementById("book-until");
+  const fromVal = fromEl.value;
+  if (!fromVal) { updateFarePreview(); return; }
+  const fromMs  = new Date(fromVal).getTime();
+  const nowMs   = Date.now();
+  // If user picked past time (>5min ago), snap to now and show warning
+  if (fromMs < nowMs - 900000) { // 15 min grace
+    const now = new Date(); now.setSeconds(0,0);
+    fromEl.value = localDatetimeStr(now);
+    toast("Start time snapped to now — past booking not allowed", "err");
+  }
+  // Auto-advance Until by same duration (default 1hr) if it's before From
+  const untilVal = untilEl.value;
+  if (!untilVal || new Date(untilVal) <= new Date(fromEl.value)) {
+    untilEl.value = localDatetimeStr(new Date(new Date(fromEl.value).getTime() + 3600000));
+  }
+  // (min not enforced via attr — free picking, validated on confirm)
+  updateFarePreview();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════════
+document.addEventListener("DOMContentLoaded", () => {
+  // ── Tab switching ──────────────────────────────────────────
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => switchTab(+t.dataset.tab));
+  });
+
+  // ── Sync topup button state on load ───────────────────────
+  (function syncTopupBtn() {
+    const s = loadState();
+    const used = s.wallet.topupCount || 0;
+    const btn  = document.getElementById("btn-topup");
+    if (used >= 3) {
+      btn.disabled = true;
+      btn.textContent = "⚡ Top-Up Limit Reached (3/3)";
+      btn.style.opacity = ".4";
+    } else if (used > 0) {
+      btn.textContent = `⚡ Add 50 IPRS-C (${3-used} left)`;
+    } else {
+      btn.textContent = `⚡ Add 50 IPRS-C — Demo (3 free)`;
+    }
+  })();
+
+  // ── Wallet actions ─────────────────────────────────────────
+  document.getElementById("btn-topup").addEventListener("click", () => {
+    const s = loadState();
+    const topups = s.wallet.topupCount || 0;
+    if (topups >= 3) {
+      toast("Max 3 demo top-ups allowed — use Exit & Pay to earn more", "err");
+      return;
+    }
+    if (s.wallet.balance >= 300) {
+      toast("Balance cap reached (300 IPRS-C) — spend some first!", "err");
+      return;
+    }
+    modifyState(s => { s.wallet.topupCount = (s.wallet.topupCount || 0) + 1; });
+    mintTokens(50, `Demo top-up #${topups + 1}`);
+    // Disable button after 3rd top-up
+    if (topups + 1 >= 3) {
+      document.getElementById("btn-topup").disabled = true;
+      document.getElementById("btn-topup").textContent = "⚡ Top-Up Limit Reached (3/3)";
+    } else {
+      const left = 3 - (topups + 1);
+      document.getElementById("btn-topup").textContent =
+        left > 0 ? `⚡ Add 50 IPRS-C (${left} left)` : `⚡ Add 50 IPRS-C (${topups+1}/3 used)`;
+    }
+  });
+  document.getElementById("btn-verify").addEventListener("click", verifyChain);
+  document.getElementById("btn-export-json").addEventListener("click", exportJSON);
+  let _resetArmed = false, _resetTimer = null;
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    const btn = document.getElementById("btn-reset");
+    if (!_resetArmed) {
+      // First click — arm the reset (show confirmation in button)
+      _resetArmed = true;
+      btn.textContent = "⚠️ Click again to CONFIRM reset";
+      btn.style.background = "rgba(239,68,68,.18)";
+      btn.style.borderColor = "var(--red)";
+      btn.style.color = "var(--red)";
+      toast("Click Reset again within 3s to confirm", "err");
+      // Auto-disarm after 3 seconds
+      _resetTimer = setTimeout(() => {
+        _resetArmed = false;
+        btn.textContent = "🔄 Reset Demo";
+        btn.style.background = "";
+        btn.style.borderColor = "";
+        btn.style.color = "";
+      }, 3000);
+    } else {
+      // Second click — execute reset
+      clearTimeout(_resetTimer);
+      _resetArmed = false;
+      try { localStorage.removeItem(STORE_KEY); } catch(e) {}
+      // Fallback: overwrite with fresh state in case removeItem fails
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(initState())); } catch(e) {}
+      toast("Wallet reset — reloading…", "info");
+      setTimeout(() => location.reload(), 400);
+    }
+  });
+
+  // ── Book actions ───────────────────────────────────────────
+  document.getElementById("btn-confirm-book").addEventListener("click", confirmBooking);
+  // FIX: "from" uses onFromChange (auto-adjust until + min guard)
+  // both "change" and "input" so fare updates live on mobile too
+  ["change","input"].forEach(ev => {
+    document.getElementById("book-from").addEventListener(ev,  onFromChange);
+    document.getElementById("book-until").addEventListener(ev, updateFarePreview);
+  });
+
+  // ── Active actions ─────────────────────────────────────────
+  document.getElementById("btn-go-book").addEventListener("click",   () => switchTab(1));
+  document.getElementById("btn-extend").addEventListener("click",    extendBooking);
+  document.getElementById("btn-exit-pay").addEventListener("click",  exitAndPay);
+  document.getElementById("btn-cancel").addEventListener("click",    cancelBooking);
+
+  // ── History exports ────────────────────────────────────────
+  document.getElementById("btn-hist-json").addEventListener("click", exportJSON);
+  document.getElementById("btn-hist-csv").addEventListener("click",  exportCSV);
+  document.getElementById("hist-action-filter").addEventListener("change", renderHistory);
+  // Update history filter on all event types — 80ms delay for iOS Safari
+  ["change","input","click"].forEach(ev =>
+    document.getElementById("hist-date-filter").addEventListener(ev, () => setTimeout(renderHistory, 80))
+  );
+  // Mobile date filter — tap the label/input to open picker directly
+  document.getElementById("hist-date-filter").addEventListener("focus", function() {
+    try { if (window.innerWidth <= 600 && this.showPicker) this.showPicker(); } catch {}
+  });
+  // Tap label wrapper trick — works on all mobile browsers incl. Safari iOS
+  document.getElementById("hist-date-filter").addEventListener("click", function() {
+    try { this.showPicker && this.showPicker(); } catch {}
+  });
+
+  // ── Modal closes ───────────────────────────────────────────
+  document.querySelectorAll(".modal-close[data-close]").forEach(btn => {
+    btn.addEventListener("click", () => closeModal(btn.dataset.close));
+  });
+  document.querySelectorAll(".modal-bg").forEach(m => {
+    m.addEventListener("click", e => { if (e.target === m) closeModal(m.id); });
+  });
+
+  // ── QR modal actions ───────────────────────────────────────
+  document.getElementById("btn-copy-token").addEventListener("click", async () => {
+    const tk = document.getElementById("qr-token-str").textContent;
+    await navigator.clipboard.writeText(tk).catch(() => {});
+    toast("Token copied", "ok");
+  });
+  document.getElementById("btn-share-token").addEventListener("click", () => {
+    const tk = document.getElementById("qr-token-str").textContent;
+    if (navigator.share) { navigator.share({ title: "IPRS Token", text: tk }).catch(() => {}); }
+    else { window.open(`https://wa.me/?text=${encodeURIComponent("IPRS Token: " + tk)}`); }
+  });
+  document.getElementById("btn-goto-active").addEventListener("click", () => {
+    closeModal("modal-qr"); switchTab(2);
+  });
+
+  // ── Receipt actions ─────────────────────────────────────────
+  document.getElementById("btn-print-receipt").addEventListener("click", () => {
+    const body = document.getElementById("receipt-modal-body").innerHTML;
+    document.getElementById("receipt-print-tpl").innerHTML = `<div class="rp-border">${body}</div>`;
+    window.print();
+  });
+  document.getElementById("btn-png-receipt").addEventListener("click", async () => {
+    try {
+      const el     = document.getElementById("receipt-modal-body");
+      const canvas = await html2canvas(el, { backgroundColor: "#111827", scale: 2 });
+      const a      = document.createElement("a");
+      a.download   = `IPRS-Receipt-${Date.now()}.png`;
+      a.href       = canvas.toDataURL("image/png"); a.click();
+      toast("Receipt downloaded", "ok");
+    } catch { toast("Download failed", "err"); }
+  });
+
+  // ── Buy IPRS Coins ────────────────────────────────────────────
+  document.getElementById("btn-buy-iprs").addEventListener("click", openBuyModal);
+  document.querySelectorAll(".buy-amt-btn").forEach(btn => {
+    btn.addEventListener("click", () => renderBuyQR(+btn.dataset.amt));
+  });
+  document.getElementById("btn-copy-upi").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(OWNER_UPI).catch(() => {});
+    toast("UPI ID copied: " + OWNER_UPI, "ok");
+  });
+  document.getElementById("btn-share-upi").addEventListener("click", () => {
+    const url = buildUpiUrl(_buyQRAmount);
+    if (navigator.share) {
+      navigator.share({ title: "Pay IPRS Parking", text: `Pay ₹${_buyQRAmount} to ${OWNER_UPI}`, url }).catch(() => {});
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`Pay ₹${_buyQRAmount} to IPRS Parking\nUPI: ${OWNER_UPI}\n${url}`)}`);
+    }
+  });
+
+  // ── Chain badge click ──────────────────────────────────────
+  document.getElementById("chain-badge").addEventListener("click", verifyChain);
+
+  // ── Init ───────────────────────────────────────────────────
+  setDefaultTimes();
+  renderSlotGrid();
+  refreshWalletUI();
+  refreshActivePanel();
+  // Set today as default date in history filter
+  (function() {
+    const dfEl = document.getElementById("hist-date-filter");
+    if (dfEl) dfEl.value = new Date().toLocaleDateString("en-CA");
+  })();
+  // (topup state already synced above in syncTopupBtn)
+  // FIX: seed welcome-bonus ledger entry on very first boot so chain is
+  // never empty — appendLedger is async so fire-and-forget, then verify.
+  (async () => {
+    const st = loadState();
+    if (!st.ledger.length && st.wallet.balance > 0) {
+      await appendLedger("mint", st.wallet.balance, st.wallet.balance, "Welcome bonus — initial credit");
+    }
+    await verifyChain();
+  })();
+  connectWS();
+
+  // Poll server for live slot states every 5s as fallback
+  setInterval(() => {
+    fetch(`${API}/slots/ENTRY`).then(r => r.json()).then(d => {
+      // FIX: /slots/ENTRY returns {slots:[{slot:1,state:"EMPTY"},…]}
+      const stateArr = Array.isArray(d.slots)
+        ? d.slots.map(sl => sl.state)
+        : (Array.isArray(d.slotStatus) ? d.slotStatus : []);
+      if (stateArr.length) {
+        stateArr.forEach((st, i) => {
+          if (SLOT_CONFIG[i]) currentSlotStates[SLOT_CONFIG[i].id] = st;
+        });
+        renderSlotGrid();
+      }
+    }).catch(() => {});
+  }, 5000);
+});
+</script>
+</body>
+</html>
